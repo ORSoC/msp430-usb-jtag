@@ -1,0 +1,1 @@
+"./tps65217.obj" "./swi2cmst.obj" "./main.obj" -l"libc.a" "../lnk_msp430f5510.cmd" 
