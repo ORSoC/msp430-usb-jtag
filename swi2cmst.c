@@ -145,18 +145,18 @@ unsigned int swi2cmst_wr1rd1(unsigned int slaveAddr, unsigned char wrData, unsig
 	unsigned int result;
 
 	swi2cmst_start();
-	swi2cmst_wrbyte((slaveAddr << 1) | SWI2CMST_WRITE);
+	swi2cmst_wrbyte((slaveAddr << 1) | SWI2CMST_WRITE );
 	result = swi2cmst_rdack();
-	if( result == SWI2CMST_OK  || SWI2CMST_IGNORE_NAK) {
+	if( result == SWI2CMST_OK  || SWI2CMST_IGNORE_NAK ) {
 		swi2cmst_wrbyte( wrData );
 		result = swi2cmst_rdack();
 	}
-	if( result == SWI2CMST_OK  || SWI2CMST_IGNORE_NAK) {
+	if( result == SWI2CMST_OK  || SWI2CMST_IGNORE_NAK ) {
 		swi2cmst_start();
-		swi2cmst_wrbyte((slaveAddr << 1) | SWI2CMST_READ);
+		swi2cmst_wrbyte((slaveAddr << 1) | SWI2CMST_READ );
 		result = swi2cmst_rdack();
 	}
-	if( result == SWI2CMST_OK  || SWI2CMST_IGNORE_NAK) {
+	if( result == SWI2CMST_OK  || SWI2CMST_IGNORE_NAK ) {
 		*pRdData = swi2cmst_rdbyte();
 		swi2cmst_wrnack();
 	}

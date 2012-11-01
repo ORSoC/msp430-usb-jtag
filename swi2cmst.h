@@ -28,7 +28,7 @@
 #define SWI2CMST_PREN   P6REN // Port internal pull-up/pull-down resistance reg
 #define SWI2CMST_PDIR   P6DIR // Port direction register
 #define SWI2CMST_POUT   P6OUT // Port output register
-#define SWI2CMST_PINP   P6IN  // Port input register  // TODO: Rename _PIN to _PINP to avoid confusion
+#define SWI2CMST_PINP   P6IN  // Port input register
 
 #define SWI2CMST_BSDA   BIT0  // Bit in registers for SDA line
 #define SWI2CMST_BSCL   BIT1  // Bit in registers for SCL line
