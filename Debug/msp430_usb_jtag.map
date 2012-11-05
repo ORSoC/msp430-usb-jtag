@@ -1,10 +1,10 @@
 ******************************************************************************
                   MSP430 Linker Unix v4.1.1                    
 ******************************************************************************
->> Linked Thu Nov  1 13:44:06 2012
+>> Linked Fri Nov  2 15:57:19 2012
 
 OUTPUT FILE NAME:   <msp430_usb_jtag.out>
-ENTRY POINT SYMBOL: "_c_int00"  address: 0000827e
+ENTRY POINT SYMBOL: "_c_int00"  address: 000082c6
 
 
 MEMORY CONFIGURATION
@@ -19,7 +19,7 @@ MEMORY CONFIGURATION
   INFOB                 00001900   00000080  00000000  00000080  RWIX
   INFOA                 00001980   00000080  00000000  00000080  RWIX
   RAM                   00002400   00001000  000000a0  00000f60  RWIX
-  FLASH                 00008000   00007f80  0000034a  00007c36  RWIX
+  FLASH                 00008000   00007f80  00000392  00007bee  RWIX
   INT00                 0000ff80   00000002  00000000  00000002  RWIX
   INT01                 0000ff82   00000002  00000000  00000002  RWIX
   INT02                 0000ff84   00000002  00000000  00000002  RWIX
@@ -100,29 +100,30 @@ section   page    origin      length       input sections
                   00003360    00000002     rts430x_lc_sd_eabi.lib : boot.obj (.stack)
                   00003362    0000009e     --HOLE--
 
-.text      0    00008000    0000034a     
-                  00008000    000000a0     main.obj (.text:boardInitOlimexino5510Orsoc8695ep4gx)
-                  000080a0    0000006e     rts430x_lc_sd_eabi.lib : autoinit.obj (.text:_auto_init)
-                  0000810e    00000060     main.obj (.text:ledFlash)
-                  0000816e    00000048     swi2cmst.obj (.text:swi2cmst_wr1rd1)
-                  000081b6    00000030     main.obj (.text:main)
-                  000081e6    0000002a     swi2cmst.obj (.text:swi2cmst_wr2)
-                  00008210    0000002a     swi2cmst.obj (.text:swi2cmst_wrbit)
-                  0000823a    00000022     swi2cmst.obj (.text:swi2cmst_start)
-                  0000825c    00000022     swi2cmst.obj (.text:swi2cmst_wrbyte)
-                  0000827e    0000001a     rts430x_lc_sd_eabi.lib : boot.obj (.text:_isr:_c_int00_noexit)
-                  00008298    0000001a     swi2cmst.obj (.text:swi2cmst_init)
-                  000082b2    0000001a     swi2cmst.obj (.text:swi2cmst_rdbit)
-                  000082cc    0000001a     swi2cmst.obj (.text:swi2cmst_stop)
-                  000082e6    00000018     swi2cmst.obj (.text:swi2cmst_rdbyte)
-                  000082fe    00000010     swi2cmst.obj (.text:swi2cmst_rdack)
-                  0000830e    0000000e     tps65217.obj (.text:tps65217_rdReg)
-                  0000831c    0000000e     tps65217.obj (.text:tps65217_wrReg)
-                  0000832a    0000000a     tps65217.obj (.text:tps65217_chipId)
-                  00008334    00000008     swi2cmst.obj (.text:swi2cmst_wrnack)
-                  0000833c    00000006     main.obj (.text:boardInit)
-                  00008342    00000004     rts430x_lc_sd_eabi.lib : pre_init.obj (.text:_system_pre_init)
-                  00008346    00000004                            : exit.obj (.text:abort)
+.text      0    00008000    00000392     
+                  00008000    000000a4     main.obj (.text:boardInitOlimexino5510Orsoc8695ep4gx)
+                  000080a4    0000006e     rts430x_lc_sd_eabi.lib : autoinit.obj (.text:_auto_init)
+                  00008112    00000060     main.obj (.text:ledFlash)
+                  00008172    00000048     main.obj (.text:main)
+                  000081ba    00000048     swi2cmst.obj (.text:swi2cmst_wr1rd1)
+                  00008202    0000002c     swi2cmst.obj (.text:swi2cmst_clrbus)
+                  0000822e    0000002a     swi2cmst.obj (.text:swi2cmst_wr2)
+                  00008258    0000002a     swi2cmst.obj (.text:swi2cmst_wrbit)
+                  00008282    00000022     swi2cmst.obj (.text:swi2cmst_start)
+                  000082a4    00000022     swi2cmst.obj (.text:swi2cmst_wrbyte)
+                  000082c6    0000001a     rts430x_lc_sd_eabi.lib : boot.obj (.text:_isr:_c_int00_noexit)
+                  000082e0    0000001a     swi2cmst.obj (.text:swi2cmst_init)
+                  000082fa    0000001a     swi2cmst.obj (.text:swi2cmst_rdbit)
+                  00008314    0000001a     swi2cmst.obj (.text:swi2cmst_stop)
+                  0000832e    00000018     swi2cmst.obj (.text:swi2cmst_rdbyte)
+                  00008346    00000010     swi2cmst.obj (.text:swi2cmst_rdack)
+                  00008356    0000000e     tps65217.obj (.text:tps65217_rdReg)
+                  00008364    0000000e     tps65217.obj (.text:tps65217_wrReg)
+                  00008372    0000000a     tps65217.obj (.text:tps65217_chipId)
+                  0000837c    00000008     swi2cmst.obj (.text:swi2cmst_wrnack)
+                  00008384    00000006     main.obj (.text:boardInit)
+                  0000838a    00000004     rts430x_lc_sd_eabi.lib : pre_init.obj (.text:_system_pre_init)
+                  0000838e    00000004                            : exit.obj (.text:abort)
 
 .reset     0    0000fffe    00000002     
                   0000fffe    00000002     rts430x_lc_sd_eabi.lib : boot.obj (.reset)
@@ -162,7 +163,7 @@ address    name
 00000752   ADC10MEM0
 00000753   ADC10MEM0_H
 00000752   ADC10MEM0_L
-00008346   C$$EXIT
+0000838e   C$$EXIT
 000008c0   CBCTL0
 000008c1   CBCTL0_H
 000008c0   CBCTL0_L
@@ -817,32 +818,33 @@ UNDEFED    __TI_INITARRAY_Limit
 00000001   __TI_exit
 ffffffff   __binit__
 ffffffff   __c_args__
-000080a0   _auto_init
-0000827e   _c_int00
-0000827e   _c_int00_noexit
+000080a4   _auto_init
+000082c6   _c_int00
+000082c6   _c_int00_noexit
 0000fffe   _reset_vector
 00003360   _stack
-00008342   _system_pre_init
-00008346   abort
+0000838a   _system_pre_init
+0000838e   abort
 ffffffff   binit
-0000833c   boardInit
+00008384   boardInit
 00008000   boardInitOlimexino5510Orsoc8695ep4gx
-0000810e   ledFlash
-000081b6   main
-00008298   swi2cmst_init
-000082fe   swi2cmst_rdack
-000082b2   swi2cmst_rdbit
-000082e6   swi2cmst_rdbyte
-0000823a   swi2cmst_start
-000082cc   swi2cmst_stop
-0000816e   swi2cmst_wr1rd1
-000081e6   swi2cmst_wr2
-00008210   swi2cmst_wrbit
-0000825c   swi2cmst_wrbyte
-00008334   swi2cmst_wrnack
-0000832a   tps65217_chipId
-0000830e   tps65217_rdReg
-0000831c   tps65217_wrReg
+00008112   ledFlash
+00008172   main
+00008202   swi2cmst_clrbus
+000082e0   swi2cmst_init
+00008346   swi2cmst_rdack
+000082fa   swi2cmst_rdbit
+0000832e   swi2cmst_rdbyte
+00008282   swi2cmst_start
+00008314   swi2cmst_stop
+000081ba   swi2cmst_wr1rd1
+0000822e   swi2cmst_wr2
+00008258   swi2cmst_wrbit
+000082a4   swi2cmst_wrbyte
+0000837c   swi2cmst_wrnack
+00008372   tps65217_chipId
+00008356   tps65217_rdReg
+00008364   tps65217_wrReg
 
 
 GLOBAL SYMBOLS: SORTED BY Symbol Address 
@@ -1527,29 +1529,30 @@ address    name
 00003360   _stack
 00003400   __STACK_END
 00008000   boardInitOlimexino5510Orsoc8695ep4gx
-000080a0   _auto_init
-0000810e   ledFlash
-0000816e   swi2cmst_wr1rd1
-000081b6   main
-000081e6   swi2cmst_wr2
-00008210   swi2cmst_wrbit
-0000823a   swi2cmst_start
-0000825c   swi2cmst_wrbyte
-0000827e   _c_int00
-0000827e   _c_int00_noexit
-00008298   swi2cmst_init
-000082b2   swi2cmst_rdbit
-000082cc   swi2cmst_stop
-000082e6   swi2cmst_rdbyte
-000082fe   swi2cmst_rdack
-0000830e   tps65217_rdReg
-0000831c   tps65217_wrReg
-0000832a   tps65217_chipId
-00008334   swi2cmst_wrnack
-0000833c   boardInit
-00008342   _system_pre_init
-00008346   C$$EXIT
-00008346   abort
+000080a4   _auto_init
+00008112   ledFlash
+00008172   main
+000081ba   swi2cmst_wr1rd1
+00008202   swi2cmst_clrbus
+0000822e   swi2cmst_wr2
+00008258   swi2cmst_wrbit
+00008282   swi2cmst_start
+000082a4   swi2cmst_wrbyte
+000082c6   _c_int00
+000082c6   _c_int00_noexit
+000082e0   swi2cmst_init
+000082fa   swi2cmst_rdbit
+00008314   swi2cmst_stop
+0000832e   swi2cmst_rdbyte
+00008346   swi2cmst_rdack
+00008356   tps65217_rdReg
+00008364   tps65217_wrReg
+00008372   tps65217_chipId
+0000837c   swi2cmst_wrnack
+00008384   boardInit
+0000838a   _system_pre_init
+0000838e   C$$EXIT
+0000838e   abort
 0000fffe   _reset_vector
 ffffffff   __binit__
 ffffffff   __c_args__
@@ -1561,4 +1564,4 @@ UNDEFED    __TI_Handler_Table_Limit
 UNDEFED    __TI_INITARRAY_Base
 UNDEFED    __TI_INITARRAY_Limit
 
-[711 symbols]
+[712 symbols]
