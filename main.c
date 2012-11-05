@@ -1,6 +1,55 @@
-/*
- * main.c
- */
+//////////////////////////////////////////////////////////////////////
+////                                                              ////
+//// MSP430_USB_JTAG                                              ////
+////                                                              ////
+//// This software controls functions for the following:          ////
+//// * USB Device for control from a host computer                ////
+//// * JTAG configuration of FPGAs                                ////
+//// * Flash memory control                                       ////
+//// * Control of power mangegement IC                            ////
+////                                                              ////
+//// Description                                                  ////
+//// Implementation according to ref [1].                         ////
+////                                                              ////
+//// References                                                   ////
+//// [1] TPS65217A, TPS65217B, TPS65217C                          ////
+////     SINGLE-CHIP PMIC FOR BATTERY-POWERED SYSTEMS             ////
+////     SLVSB64E,  November 2011 – July 2012,                    ////
+////     Texas Instruments Incorporated                           ////
+////     http://www.ti.com/lit/gpn/tps65217a                      ////
+////                                                              ////
+//// To Do:                                                       ////
+////   - Lots                                                     ////
+////                                                              ////
+//// Author(s):                                                   ////
+////   - Per Larsson, per.larsson@orsoc.se                        ////
+////                                                              ////
+//////////////////////////////////////////////////////////////////////
+////                                                              ////
+//// Copyright (C) 2012 Authors and ORSoC AB, Sweden              ////
+////                                                              ////
+//// This source file may be used and distributed without         ////
+//// restriction provided that this copyright statement is not    ////
+//// removed from the file and that any derivative work contains  ////
+//// the original copyright notice and the associated disclaimer. ////
+////                                                              ////
+//// This source file is free software; you can redistribute it   ////
+//// and/or modify it under the terms of the GNU Lesser General   ////
+//// Public License as published by the Free Software Foundation; ////
+//// either version 2.1 of the License, or (at your option) any   ////
+//// later version.                                               ////
+////                                                              ////
+//// This source is distributed in the hope that it will be       ////
+//// useful, but WITHOUT ANY WARRANTY; without even the implied   ////
+//// warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR      ////
+//// PURPOSE. See the GNU Lesser General Public License for more  ////
+//// details.                                                     ////
+////                                                              ////
+//// You should have received a copy of the GNU Lesser General    ////
+//// Public License along with this source; if not, download it   ////
+//// from http://www.opencores.org/lgpl.shtml                     ////
+////                                                              ////
+//////////////////////////////////////////////////////////////////////
 
 #include "cfg.h"
 #include "defs.h"
@@ -24,11 +73,11 @@ void main(void) {
 	}
 	ledFlash(LED_NUMFLASH_STARTED, 0);
 
-	while(1) { // TODO: remove this temporary infinite loop
+	//while(1) { // TODO: remove this temporary infinite loop
 	  result = boardInit();
 	  numFlashes = (result == TPS65217_OK ? LED_NUMFLASH_OK : LED_NUMFLASH_ERROR);
   	  ledFlash(numFlashes, 0);
-	}
+	//}
 
 	// Program flow should never get this far, except during development
 	numFlashes = (result == OK ? LED_NUMFLASH_ENDED_OK : LED_NUMFLASH_ENDED_ERROR);
@@ -57,6 +106,7 @@ unsigned int boardInitOlimexino5510Orsoc8695ep4gx(void)
 	unsigned int result;
 
 	swi2cmst_init();
+	swi2cmst_clrbus();
 	result = tps65217_chipId(&chipId);
 	if(result == TPS65217_OK) {
 		chipRev = chipId & 0x0F;
@@ -87,6 +137,7 @@ unsigned int boardInitOrdb3a(void)
 	unsigned int result;
 
 	swi2cmst_init();
+	swi2cmst_clrbus();
 	result = tps65217_chipId(&chipId);
 	if(result == TPS65217_OK) {
 		chipRev = chipId & 0x0F;
@@ -144,6 +195,11 @@ unsigned int boardInitOrdb3a(void)
 	result |= tps65217_wrReg(TPS65217_ENABLE,   TPS65217_ENABLE_LS2_EN);
 	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_ENABLE);
 	result |= tps65217_wrReg(TPS65217_ENABLE,   TPS65217_ENABLE_LS2_EN);
+
+	// TODO: Fix: It seems like the TP265217 hangs here, with both SCL and SDA low.
+	//       This was found with a quick measurement, which may be inaccurate.
+
+	// TODO: Set sequencing registers
 
 	PWR_EN_ON;
 
