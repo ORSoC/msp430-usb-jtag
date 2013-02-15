@@ -332,11 +332,18 @@ BOOL HidToHostFromBuffer (BYTE intfNum)
         USB_TX_memcpy(pEP1 + 2, HidWriteCtrl[INTFNUM_OFFSET(
                                                  intfNum)].pHidBufferToSend,
             byte_count);                                                        //copy data into IEP3 X or Y buffer
+#if 0   /* TI HID datapipe protocol */
         pEP1[0] = 0x3F;                                                         //set HID report descriptor: 0x3F
         pEP1[1] = byte_count;                                                   //set HID report descriptor
 
         //64 bytes will be send: we use only one HID report descriptor
         *pCT1 = 0x40;                                                           //Set counter for usb In-Transaction
+#else   /* virtual FTDI protocol */
+        pEP1[0] = 0x31;    // Line status bytes for FTDI
+        pEP1[1] = 0x60;
+
+        *pCT1 = byte_count+2;                      //Set counter for usb In-Transaction
+#endif
 
         HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft -= byte_count;
         HidWriteCtrl[INTFNUM_OFFSET(intfNum)].pHidBufferToSend += byte_count;   //move buffer pointer
@@ -355,11 +362,18 @@ BOOL HidToHostFromBuffer (BYTE intfNum)
             USB_TX_memcpy(pEP2 + 2, HidWriteCtrl[INTFNUM_OFFSET(
                                                      intfNum)].pHidBufferToSend,
                 byte_count);                                                    //copy data into IEP3 X or Y buffer
+#if 0   /* TI HID datapipe protocol */
             pEP2[0] = 0x3F;                                                     //set HID report descriptor: 0x3F
             pEP2[1] = byte_count;                                               //set byte count of valid data
 
             //64 bytes will be send: we use only one HID report descriptor
             *pCT2 = 0x40;                                                       //Set counter for usb In-Transaction
+#else   /* virtual FTDI protocol */
+	    pEP2[0] = 0x31;    // Line status bytes for FTDI
+	    pEP2[1] = 0x60;
+
+	    *pCT2 = byte_count+2;                      //Set counter for usb In-Transaction
+#endif
 
             HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft -=
                 byte_count;
