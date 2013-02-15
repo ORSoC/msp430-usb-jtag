@@ -518,12 +518,16 @@ BYTE USBHID_receiveData (BYTE* data, WORD size, BYTE intfNum)
         //try read data from second buffer
         if (nTmp1 & EPBCNT_NAK){                                            //if the second buffer has received data?
             nTmp1 = nTmp1 & 0x7f;                                           //clear NAK bit
+#if 0   /* TI HID datapipe protocol */
             HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp =
                 *(HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCurrentEpPos + 1);  //holds how many valid bytes in the EP buffer
             if (HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp > nTmp1 - 2){
                 HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = nTmp1 - 2;
             }
             HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCurrentEpPos += 2;        //here starts user data
+#else   /* FTDI compatible (plain output, variable packets) */
+	    HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = nTmp1;
+#endif
             HidCopyUsbToBuff(HidReadCtrl[INTFNUM_OFFSET(
                                              intfNum)].pCurrentEpPos,
                 HidReadCtrl[INTFNUM_OFFSET(
@@ -582,12 +586,16 @@ BYTE USBHID_receiveData (BYTE* data, WORD size, BYTE intfNum)
 
         if (nTmp1 & EPBCNT_NAK){
             nTmp1 = nTmp1 & 0x7f;                                           //clear NAK bit
+#if 0   /* TI HID datapipe protocol */
             HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp =
                 *(HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCurrentEpPos + 1);  //holds how many valid bytes in the EP buffer
             if (HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp > nTmp1 - 2){
                 HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = nTmp1 - 2;
             }
             HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCurrentEpPos += 2;        //here starts user data
+#else   /* FTDI compatible (plain output, variable packets) */
+	    HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = nTmp1;
+#endif
             HidCopyUsbToBuff(HidReadCtrl[INTFNUM_OFFSET(
                                              intfNum)].pCurrentEpPos,
                 HidReadCtrl[INTFNUM_OFFSET(
@@ -600,6 +608,7 @@ BYTE USBHID_receiveData (BYTE* data, WORD size, BYTE intfNum)
                  0) &&                                                      //do we have more data to receive?
                 (nTmp1 & EPBCNT_NAK)){                                      //if the second buffer has received data?
                 nTmp1 = nTmp1 & 0x7f;                                       //clear NAK bit
+#if 0   /* TI HID datapipe protocol */
                 HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp =
                     *(HidReadCtrl[INTFNUM_OFFSET(intfNum)].pEP2 + 1);       //holds how many valid bytes in the EP buffer
                 if (HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp > nTmp1 -
@@ -607,6 +616,9 @@ BYTE USBHID_receiveData (BYTE* data, WORD size, BYTE intfNum)
                     HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = nTmp1 - 2;
                 }
                 HidReadCtrl[INTFNUM_OFFSET(intfNum)].pEP2 += 2;             //here starts user data
+#else   /* FTDI compatible (plain output, variable packets) */
+		HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = nTmp1;
+#endif
                 HidCopyUsbToBuff(HidReadCtrl[INTFNUM_OFFSET(
                                                  intfNum)].pEP2,
                     HidReadCtrl[INTFNUM_OFFSET(
@@ -685,11 +697,15 @@ BOOL HidToBufferFromHost (BYTE intfNum)
 
     if (nTmp1 & EPBCNT_NAK){
         nTmp1 = nTmp1 & 0x7f;                                                   //clear NAK bit
+#if 0   /* TI HID datapipe protocol */
         HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = *(pEP1 + 1);          //holds how many valid bytes in the EP buffer
         if (HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp > nTmp1 - 2){
             HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = nTmp1 - 2;
         }
         pEP1 += 2;                                                              //here starts user data
+#else   /* FTDI compatible (plain output, variable packets) */
+        HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = nTmp1;
+#endif
         HidCopyUsbToBuff(pEP1, HidReadCtrl[INTFNUM_OFFSET(
                                                intfNum)].pCT1,intfNum);
 
@@ -698,11 +714,15 @@ BOOL HidToBufferFromHost (BYTE intfNum)
         if ((HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesToReceiveLeft > 0) &&   //do we have more data to send?
             (nTmp1 & EPBCNT_NAK)){                                              //if the second buffer has received data?
             nTmp1 = nTmp1 & 0x7f;                                               //clear NAK bit
+#if 0   /* TI HID datapipe protocol */
             HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = *(pEP1 + 1);      //holds how many valid bytes in the EP buffer
             if (HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp > nTmp1 - 2){
                 HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = nTmp1 - 2;
             }
             HidReadCtrl[INTFNUM_OFFSET(intfNum)].pEP2 += 2;                     //here starts user data
+#else   /* FTDI compatible (plain output, variable packets) */
+	    HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp = nTmp1;
+#endif
             HidCopyUsbToBuff(HidReadCtrl[INTFNUM_OFFSET(
                                              intfNum)].pEP2,
                 HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT2,intfNum);
@@ -905,6 +925,7 @@ BYTE USBHID_bytesInUSBBuffer (BYTE intfNum)
                                                                                 //was read of the OEP buffer
         bTmp1 = HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp;
         if (*HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT2 & EPBCNT_NAK){           //the next buffer has a valid data packet
+#if 0   /* TI HID datapipe protocol */
             bTmp2 = *(HidReadCtrl[INTFNUM_OFFSET(intfNum)].pEP2 + 1);           //holds how many valid bytes in the EP buffer
             if (bTmp2 >
                 (*HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT2 & 0x7F) - 2){       //check if all data received correctly
@@ -913,22 +934,34 @@ BYTE USBHID_bytesInUSBBuffer (BYTE intfNum)
             } else {
                 bTmp1 += bTmp2;
             }
+#else   /* FTDI compatible (plain output, variable packets) */
+	    bTmp1 +=
+                    (*HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT2 & 0x7F);
+#endif
         }
     } else {
         if (tOutputEndPointDescriptorBlock[edbIndex].bEPBCTX & EPBCNT_NAK){     //this buffer has a valid data packet
             bTmp2 = tOutputEndPointDescriptorBlock[edbIndex].bEPBCTX & 0x7F;
+#if 0   /* TI HID datapipe protocol */
             bTmp1 = *((BYTE*)stUsbHandle[intfNum].oep_X_Buffer + 1);
             if (bTmp2 - 2 < bTmp1){                                             //check if the count (second byte) is valid
                 bTmp1 = bTmp2 - 2;
             }
+#else   /* FTDI compatible (plain output, variable packets) */
+	    bTmp1 = bTmp2;
+#endif
         }
         if (tOutputEndPointDescriptorBlock[edbIndex].bEPBCTY & EPBCNT_NAK){     //this buffer has a valid data packet
             bTmp2 = tOutputEndPointDescriptorBlock[edbIndex].bEPBCTY & 0x7F;
+#if 0   /* TI HID datapipe protocol */
             if (bTmp2 - 2 > *((BYTE*)stUsbHandle[intfNum].oep_Y_Buffer + 1)){   //check if the count (second byte) is valid
                 bTmp1 += *((BYTE*)stUsbHandle[intfNum].oep_Y_Buffer + 1);
             } else {
                 bTmp1 += bTmp2 - 2;
             }
+#else   /* FTDI compatible (plain output, variable packets) */
+	    bTmp1 += bTmp2;
+#endif
         }
     }
 
