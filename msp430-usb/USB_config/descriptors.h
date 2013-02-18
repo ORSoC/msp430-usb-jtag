@@ -55,8 +55,8 @@ extern "C"
 
 // Configuration Constants that can change
 // #define that relates to Device Descriptor
-#define USB_VID               0x2047        // Vendor ID (VID)
-#define USB_PID               0x0301        // Product ID (PID)
+#define USB_VID               0x09fb        // Vendor ID (VID)
+#define USB_PID               0x6001        // Product ID (PID)
 /*----------------------------------------------------------------------------+
 | Firmware Version                                                            |
 | How to detect version number of the FW running on MSP430?                   |
@@ -71,8 +71,8 @@ extern "C"
 #define USB_STR_INDEX_SERNUM  3             
  #define PHDC_ENDPOINTS_NUMBER               2  // bulk in, bulk out
 
-
-#define DESCRIPTOR_TOTAL_LENGTH             41    // wTotalLength, This is the sum of configuration descriptor length  + CDC descriptor length  + HID descriptor length
+/* We do not use HID, so need no report descriptors. Nor have we activated CDC yet. */
+#define DESCRIPTOR_TOTAL_LENGTH             (SIZEOF_CONFIG_DESCRIPTOR+SIZEOF_INTERFACE_DESCRIPTOR)    // wTotalLength, This is the sum of configuration descriptor length  + CDC descriptor length  + HID descriptor length
 #define USB_NUM_INTERFACES                  1    // Number of implemented interfaces.
 
 #define HID0_REPORT_INTERFACE              0              // Report interface number of HID0
@@ -144,6 +144,8 @@ extern "C"
 
 //Calculates the endpoint descriptor block number from given address
 #define EDB(addr) ((addr&0x07)-1)
+
+#pragma pack(1)
 
 /* Structure for generic part of configuration descriptor */
 struct abromConfigurationDescriptorGenric
@@ -337,6 +339,7 @@ struct  abromConfigurationDescriptorGroup
     const struct abromConfigurationDescriptorPhdc stPhdc[PHDC_NUM_INTERFACES];
 #endif
 };
+#pragma pack()
 
 extern const struct  abromConfigurationDescriptorGroup abromConfigurationDescriptorGroup;
 extern BYTE const abromDeviceDescriptor[SIZEOF_DEVICE_DESCRIPTOR];

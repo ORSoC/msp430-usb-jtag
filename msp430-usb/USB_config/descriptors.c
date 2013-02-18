@@ -47,7 +47,7 @@ WORD const report_desc_size[HID_NUM_INTERFACES] =
 };
 WORD const report_len_input[HID_NUM_INTERFACES] =
 {
-64
+64	/* With our modifications, specifies maximum size of input packets */
 };
 /*-----------------------------------------------------------------------------+
 | Device Descriptor                                                            |
@@ -91,7 +91,7 @@ const struct abromConfigurationDescriptorGroup abromConfigurationDescriptorGroup
 
     /******************************************************* start of HID*************************************/
     {
-	/*start HID[0] Here */
+	/*start HID[0] Here - actually not HID but USB-Blaster bulk (emulating FT245) */
         {
             //-------- Descriptor for HID class device -------------------------------------
             // INTERFACE DESCRIPTOR (9 bytes) 
@@ -100,11 +100,12 @@ const struct abromConfigurationDescriptorGroup abromConfigurationDescriptorGroup
             HID0_REPORT_INTERFACE,              // bInterfaceNumber
             0x00,                               // bAlternateSetting
             2,                                  // bNumEndpoints
-            0x03,                               // bInterfaceClass: 3 = HID Device
-            0,                                  // bInterfaceSubClass:
-            0,                                  // bInterfaceProtocol:
+            0xFF,                               // bInterfaceClass: 3 = HID Device, FF=vendor specific
+            0xFF,                               // bInterfaceSubClass:
+            0xFF,                               // bInterfaceProtocol:
             INTF_STRING_INDEX + 0,              // iInterface:1
 
+#if 0
             // HID DESCRIPTOR (9 bytes)
             0x09,     			                // bLength of HID descriptor
             0x21,             		            // HID Descriptor Type: 0x21
@@ -128,7 +129,7 @@ const struct abromConfigurationDescriptorGroup abromConfigurationDescriptorGroup
             EP_DESC_ATTR_TYPE_INT,              // bmAttributes, interrupt transfers
             0x40, 0x00,                         // wMaxPacketSize, 64 bytes
             1,                                  // bInterval, ms
-	         /* end of HID[0]*/
+#endif	         /* end of HID[0]*/
         }
 
     }
@@ -148,15 +149,15 @@ BYTE const abromStringDescriptor[] = {
 	// String index1, Manufacturer
 	36,		// Length of this string descriptor
 	3,		// bDescriptorType
-	'T',0x00,'e',0x00,'x',0x00,'a',0x00,'s',0x00,' ',0x00,
-	'I',0x00,'n',0x00,'s',0x00,'t',0x00,'r',0x00,'u',0x00,
-	'm',0x00,'e',0x00,'n',0x00,'t',0x00,'s',0x00,
+	'O',0x00,'R',0x00,'S',0x00,'o',0x00,'C',0x00,' ',0x00,
+	'A',0x00,'B',0x00,' ',0x00,' ',0x00,' ',0x00,' ',0x00,
+	' ',0x00,' ',0x00,' ',0x00,' ',0x00,' ',0x00,
 
 	// String index2, Product
 	38,		// Length of this string descriptor
 	3,		// bDescriptorType
-	'M',0x00,'S',0x00,'P',0x00,'4',0x00,'3',0x00,'0',0x00,
-	'-',0x00,'U',0x00,'S',0x00,'B',0x00,' ',0x00,'E',0x00,
+	'U',0x00,'S',0x00,'B',0x00,' ',0x00,'B',0x00,'l',0x00,
+	'a',0x00,'s',0x00,'t',0x00,'e',0x00,'r',0x00,' ',0x00,
 	'x',0x00,'a',0x00,'m',0x00,'p',0x00,'l',0x00,'e',0x00,
 
 	// String index3, Serial Number
@@ -173,7 +174,7 @@ BYTE const abromStringDescriptor[] = {
 	// String index5, Interface String
 	28,		// Length of this string descriptor
 	3,		// bDescriptorType
-	'H',0x00,'I',0x00,'D',0x00,' ',0x00,'I',0x00,'n',0x00,
+	'F',0x00,'T',0x00,'D',0x00,'I',0x00,'I',0x00,'n',0x00,
 	't',0x00,'e',0x00,'r',0x00,'f',0x00,'a',0x00,'c',0x00,
 	'e',0x00
 };
@@ -224,7 +225,7 @@ const struct tUsbHandle stUsbHandle[]=
 
 const tDEVICE_REQUEST_COMPARE tUsbRequestList[] = 
 {
-
+#if 0
     //---- HID 0 Class Requests -----//
     USB_REQ_TYPE_INPUT | USB_REQ_TYPE_CLASS | USB_REQ_TYPE_INTERFACE,
  	USB_REQ_GET_REPORT,
@@ -254,7 +255,7 @@ const tDEVICE_REQUEST_COMPARE tUsbRequestList[] =
     HID0_REPORT_INTERFACE,0x00,
     0xff,0xff,
     0xdc,&usbGetHidDescriptor,
-
+#endif
     //---- USB Standard Requests -----//
     // clear device feature
     USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
