@@ -72,7 +72,8 @@ extern "C"
  #define PHDC_ENDPOINTS_NUMBER               2  // bulk in, bulk out
 
 /* We do not use HID, so need no report descriptors. Nor have we activated CDC yet. */
-#define DESCRIPTOR_TOTAL_LENGTH             (SIZEOF_CONFIG_DESCRIPTOR+SIZEOF_INTERFACE_DESCRIPTOR)    // wTotalLength, This is the sum of configuration descriptor length  + CDC descriptor length  + HID descriptor length
+#define DESCRIPTOR_TOTAL_LENGTH             (SIZEOF_CONFIG_DESCRIPTOR+SIZEOF_INTERFACE_DESCRIPTOR+ \
+		2*SIZEOF_ENDPOINT_DESCRIPTOR)    // wTotalLength, This is the sum of configuration descriptor length  + CDC descriptor length  + HID descriptor length
 #define USB_NUM_INTERFACES                  1    // Number of implemented interfaces.
 
 #define HID0_REPORT_INTERFACE              0              // Report interface number of HID0
