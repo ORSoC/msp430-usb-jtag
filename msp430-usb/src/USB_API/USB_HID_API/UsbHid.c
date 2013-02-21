@@ -240,9 +240,11 @@ BYTE USBHID_sendData (const BYTE* data, WORD size, BYTE intfNum)
 
     edbIndex = stUsbHandle[intfNum].edb_Index;
 
+#if 0
     if (size == 0){
         return (kUSBHID_generalError);
     }
+#endif
 
     bGIE  = (__get_SR_register() & GIE);                                    //save interrupt status
 
@@ -266,7 +268,7 @@ BYTE USBHID_sendData (const BYTE* data, WORD size, BYTE intfNum)
     //This function generate the USB interrupt. The data will be sent out from interrupt
 
     HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSend = size;
-    HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft = size;
+    HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft = size?size:-1;
     HidWriteCtrl[INTFNUM_OFFSET(intfNum)].pHidBufferToSend = data;
 
     //trigger Endpoint Interrupt - to start send operation
@@ -299,6 +301,8 @@ BOOL HidToHostFromBuffer (BYTE intfNum)
             bWakeUp = USBHID_handleSendCompleted(intfNum);
         }
         return (bWakeUp);
+    } else if (HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft == -1) {
+        HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft = 0;
     }
 
     if (!(tInputEndPointDescriptorBlock[edbIndex].bEPCNF & EPCNF_TOGGLE)){
@@ -859,7 +863,7 @@ BYTE USBHID_intfStatus (BYTE intfNum, WORD* bytesSent, WORD* bytesReceived)
     __disable_interrupt();                                                      //disable interrupts - atomic operation
 
     //Is send operation underway?
-    if (HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft != 0){
+    if (HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft >= 0){
         ret |= kUSBHID_waitingForSend;
         *bytesSent = HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSend -
                      HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft;
