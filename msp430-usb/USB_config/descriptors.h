@@ -255,6 +255,7 @@ struct abromConfigurationDescriptorHid
     BYTE binterfaceprotocol;                 // Protocol
     BYTE intf_string_index;                  // String Index
 
+#if 0
 //hid descriptor (9 bytes)
     BYTE blength_hid_descriptor;             // HID Desc length
     BYTE hid_descriptor_type;                // HID Desc Type
@@ -265,6 +266,7 @@ struct abromConfigurationDescriptorHid
     BYTE report_descriptor_type;             // Report desc type 
     BYTE tlength;                            // Total length of report descriptor
     BYTE size_rep_desc;
+#endif
 
 //input end point descriptor (7 bytes)
     BYTE size_inp_endpoint_descriptor;       // End point desc size

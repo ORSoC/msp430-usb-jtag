@@ -129,6 +129,7 @@ const struct abromConfigurationDescriptorGroup abromConfigurationDescriptorGroup
             EP_DESC_ATTR_TYPE_BULK,              // bmAttributes, interrupt transfers
             0x40, 0x00,                         // wMaxPacketSize, 64 bytes
             0,                                  // bInterval, ms
+
 	         /* end of HID[0]*/
         }
 
@@ -146,19 +147,30 @@ BYTE const abromStringDescriptor[] = {
 	3,		// LANGID tag
 	0x09, 0x04,	// 0x0409 for English
 
+#if 1
+	2, 3,	// Empty string
+#else
 	// String index1, Manufacturer
 	36,		// Length of this string descriptor
 	3,		// bDescriptorType
 	'O',0x00,'R',0x00,'S',0x00,'o',0x00,'C',0x00,' ',0x00,
 	'A',0x00,'B',0x00,' ',0x00,' ',0x00,' ',0x00,' ',0x00,
 	' ',0x00,' ',0x00,' ',0x00,' ',0x00,' ',0x00,
+#endif
 
+#if 1
+	2+2*10,	// length of descriptor
+	3,	// bDescriptorType=string
+	'U',0x00,'s',0x00,'b',0x00,'B',0x00,'l',0x00,'a',0x00,
+	's',0x00,'t',0x00,'e',0x00,'r',0x00,
+#else
 	// String index2, Product
 	38,		// Length of this string descriptor
 	3,		// bDescriptorType
 	'U',0x00,'S',0x00,'B',0x00,' ',0x00,'B',0x00,'l',0x00,
 	'a',0x00,'s',0x00,'t',0x00,'e',0x00,'r',0x00,' ',0x00,
 	'x',0x00,'a',0x00,'m',0x00,'p',0x00,'l',0x00,'e',0x00,
+#endif
 
 	// String index3, Serial Number
 	4,		// Length of this string descriptor
@@ -222,9 +234,19 @@ const struct tUsbHandle stUsbHandle[]=
     }
 };
 //-------------DEVICE REQUEST LIST---------------------------------------------
+/* Ignore FTDI specific device set requests (such as modes and baud rates) */
+BYTE usbSetVendor(VOID) {
+	/* Just acknowledge the data without using it */
+        usbSendZeroLengthPacketOnIEP0();
+	return (FALSE);
+}
 
 const tDEVICE_REQUEST_COMPARE tUsbRequestList[] = 
 {
+	/* Vendor specific requests - sent for FTDI chip */
+	USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_CLASS | USB_REQ_TYPE_DEVICE, 0,
+	0,0, 0,0, 0,0,
+	0x80, &usbSetVendor,
 #if 0
     //---- HID 0 Class Requests -----//
     USB_REQ_TYPE_INPUT | USB_REQ_TYPE_CLASS | USB_REQ_TYPE_INTERFACE,
