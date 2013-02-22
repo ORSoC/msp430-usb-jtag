@@ -513,7 +513,7 @@ BYTE USB_reset ()
          i < (CDC_NUM_INTERFACES + HID_NUM_INTERFACES + MSC_NUM_INTERFACES + PHDC_NUM_INTERFACES);
          i++)
     {
-        BYTE edbIndex = stUsbHandle[i].ep_In_Addr-0x81;
+        BYTE edbIndex = stUsbHandle[i].ep_In_Addr-DIRECTION_IN-1;
 
         /* Set settings for IEPx */
         tInputEndPointDescriptorBlock[edbIndex].bEPCNF   = EPCNF_USBIE |
@@ -530,7 +530,7 @@ BYTE USB_reset ()
         tInputEndPointDescriptorBlock[edbIndex].bEPSIZXY = MAX_PACKET_SIZE;
 
         /* Set settings for OEPx */
-        edbIndex = stUsbHandle[i].ep_Out_Addr-1;
+        edbIndex = stUsbHandle[i].ep_Out_Addr-DIRECTION_OUT-1;
 #ifdef BRIDGE_CDC_PRESENT
         if (i == BRIDGE_CDC_INTFNUM) {
             tOutputEndPointDescriptorBlock[edbIndex].bEPCNF   = EPCNF_USBIE |

@@ -77,7 +77,7 @@ extern "C"
 #define USB_NUM_INTERFACES                  1    // Number of implemented interfaces.
 
 #define HID0_REPORT_INTERFACE              0              // Report interface number of HID0
-#define HID0_OUTEP_ADDR                    0x01           // Output Endpoint number of HID0
+#define HID0_OUTEP_ADDR                    0x02           // Output Endpoint number of HID0
 #define HID0_INEP_ADDR                     0x81           // Input Endpoint number of HID0
 
 #define CDC_NUM_INTERFACES                   0           //  Total Number of CDCs implemented. should set to 0 if there are no CDCs implemented.
@@ -90,7 +90,7 @@ extern "C"
 
 #define PUTWORD(x)      ((x)&0xFF),((x)>>8)
 
-#define USB_OUTEP_INT_EN BIT0 | BIT1 
+#define USB_OUTEP_INT_EN BIT0 | BIT2 
 #define USB_INEP_INT_EN BIT0 | BIT1 
 // MCLK frequency of MCU, in Hz
 // For running higher frequencies the Vcore voltage adjustment may required.
