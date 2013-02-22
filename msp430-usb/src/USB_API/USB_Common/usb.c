@@ -42,6 +42,7 @@
 #include "../USB_Common/usb.h"      //USB-specific Data Structures
 #include "../USB_CDC_API/UsbCdc.h"
 #include "../USB_PHDC_API/UsbPHDC.h"
+#include "../USB_HID_API/UsbHid.h"
 #include "../USB_HID_API/UsbHidReq.h"
 #include "../USB_MSC_API/UsbMscScsi.h"
 #include <descriptors.h>
@@ -512,7 +513,7 @@ BYTE USB_reset ()
          i < (CDC_NUM_INTERFACES + HID_NUM_INTERFACES + MSC_NUM_INTERFACES + PHDC_NUM_INTERFACES);
          i++)
     {
-        BYTE edbIndex = stUsbHandle[i].edb_Index;
+        BYTE edbIndex = stUsbHandle[i].ep_In_Addr-0x81;
 
         /* Set settings for IEPx */
         tInputEndPointDescriptorBlock[edbIndex].bEPCNF   = EPCNF_USBIE |
@@ -529,6 +530,7 @@ BYTE USB_reset ()
         tInputEndPointDescriptorBlock[edbIndex].bEPSIZXY = MAX_PACKET_SIZE;
 
         /* Set settings for OEPx */
+        edbIndex = stUsbHandle[i].ep_Out_Addr-1;
 #ifdef BRIDGE_CDC_PRESENT
         if (i == BRIDGE_CDC_INTFNUM) {
             tOutputEndPointDescriptorBlock[edbIndex].bEPCNF   = EPCNF_USBIE |
@@ -558,6 +560,7 @@ BYTE USB_reset ()
 
 #       ifdef _CDC_
         /* Additional interrupt end point for CDC */
+        edbIndex = stUsbHandle[i].edb_Index;
         if (stUsbHandle[i].dev_Class == CDC_CLASS){
             //The decriptor tool always generates the managemnet endpoint before the data endpoint
             tInputEndPointDescriptorBlock[edbIndex -
