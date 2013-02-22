@@ -119,7 +119,7 @@ BYTE USBHID_sendReport (const BYTE * reportData, BYTE intfNum)
 
     BYTE edbIndex;
 
-    edbIndex = stUsbHandle[intfNum].edb_Index;
+    edbIndex = stUsbHandle[intfNum].ep_In_Addr-0x81;
 
     //do not access USB memory if suspended (PLL off). It may produce BUS_ERROR
     if ((bFunctionSuspended) ||
@@ -162,7 +162,7 @@ BYTE USBHID_receiveReport (BYTE * reportData, BYTE intfNum)
 
     BYTE edbIndex;
 
-    edbIndex = stUsbHandle[intfNum].edb_Index;
+    edbIndex = stUsbHandle[intfNum].ep_Out_Addr-1;
 
     //do not access USB memory if suspended (PLL off). It may produce BUS_ERROR
     if ((bFunctionSuspended) ||
@@ -238,7 +238,7 @@ BYTE USBHID_sendData (const BYTE* data, WORD size, BYTE intfNum)
     unsigned short bGIE;
     BYTE edbIndex;
 
-    edbIndex = stUsbHandle[intfNum].edb_Index;
+    edbIndex = stUsbHandle[intfNum].ep_In_Addr-0x81;
 
 #if 0
     if (size == 0){
@@ -291,7 +291,7 @@ BOOL HidToHostFromBuffer (BYTE intfNum)
 
     BYTE edbIndex;
 
-    edbIndex = stUsbHandle[intfNum].edb_Index;
+    edbIndex = stUsbHandle[intfNum].ep_In_Addr-0x81;
 
     if (HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft == 0){    //do we have somtething to send?
         HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSend = 0;
@@ -461,7 +461,7 @@ BYTE USBHID_receiveData (BYTE* data, WORD size, BYTE intfNum)
     unsigned short bGIE;
     BYTE edbIndex;
 
-    edbIndex = stUsbHandle[intfNum].edb_Index;
+    edbIndex = stUsbHandle[intfNum].ep_Out_Addr-1;
 
     if ((size == 0) ||                                                      //read size is 0
         (data == NULL)){
@@ -658,7 +658,7 @@ BOOL HidToBufferFromHost (BYTE intfNum)
 
     BYTE edbIndex;
 
-    edbIndex = stUsbHandle[intfNum].edb_Index;
+    edbIndex = stUsbHandle[intfNum].ep_Out_Addr-1;
 
     if (HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesToReceiveLeft == 0){     //do we have somtething to receive?
         HidReadCtrl[INTFNUM_OFFSET(intfNum)].pUserBuffer = NULL;            //no more receiving pending
@@ -794,7 +794,7 @@ BYTE USBHID_rejectData (BYTE intfNum)
     unsigned short bGIE;
     BYTE edbIndex;
 
-    edbIndex = stUsbHandle[intfNum].edb_Index;
+    edbIndex = stUsbHandle[intfNum].ep_Out_Addr-1;
 
     bGIE  = (__get_SR_register() & GIE);                                        //save interrupt status
 
@@ -857,7 +857,7 @@ BYTE USBHID_intfStatus (BYTE intfNum, WORD* bytesSent, WORD* bytesReceived)
     *bytesSent = 0;
     *bytesReceived = 0;
 
-    edbIndex = stUsbHandle[intfNum].edb_Index;
+    edbIndex = stUsbHandle[intfNum].ep_Out_Addr-1;
 
     bGIE  = (__get_SR_register() & GIE);                                        //save interrupt status
     __disable_interrupt();                                                      //disable interrupts - atomic operation
@@ -913,7 +913,7 @@ BYTE USBHID_bytesInUSBBuffer (BYTE intfNum)
 
     bGIE  = (__get_SR_register() & GIE);                                        //save interrupt status
 
-    edbIndex = stUsbHandle[intfNum].edb_Index;
+    edbIndex = stUsbHandle[intfNum].ep_Out_Addr-1;
 
     //interrupts disable
     __disable_interrupt();
