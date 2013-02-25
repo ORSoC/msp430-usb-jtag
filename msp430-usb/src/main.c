@@ -34,7 +34,7 @@
  * LED Control Demo:
  *
  * This USB demo example is to be used with a PC application (e.g. HyperTerminal)
- * This demo application is used to control the operation of the LED at P1.0
+ * This demo application is used to control the operation of the LED at PJ.3
  *
  * Typing the following pharses in the HyperTerminal Window does the following
  * 1. "LED ON" Turns on the LED and returns "LED is ON" phrase to PC
@@ -142,13 +142,13 @@ VOID main (VOID)
                     if (retInString(wholeString)){                                  //Has the user pressed return yet?
                         if (!(strcmp(wholeString, "LED ON"))){                      //Compare to string #1, and respond
                             TA1CTL &= ~MC_1;                                        //Turn off Timer
-                            P1OUT |= BIT0;                                          //Turn on LED P1.0
+                            PJOUT |= BIT3;                                          //Turn on LED PJ.3
                             strcpy(outString,"\r\nLED is ON\r\n\r\n");              //Prepare the outgoing string
                             cdcSendDataInBackground((BYTE*)outString,
                                 strlen(outString),CDC0_INTFNUM,0);                  //Send the response over USB
                         } else if (!(strcmp(wholeString, "LED OFF"))){              //Compare to string #2, and respond
                             TA1CTL &= ~MC_1;                                        //Turn off Timer
-                            P1OUT &= ~BIT0;                                         //Turn off LED P1.0
+                            PJOUT &= ~BIT3;                                         //Turn off LED PJ.3
                             strcpy(outString,"\r\nLED is OFF\r\n\r\n");             //Prepare the outgoing string
                             cdcSendDataInBackground((BYTE*)outString,
                                 strlen(outString),CDC0_INTFNUM,0);                  //Send the response over USB
@@ -184,7 +184,7 @@ VOID main (VOID)
                 break;
 
             case ST_ENUM_SUSPENDED:
-                P1OUT &= ~BIT0;                                                     //When suspended, turn off LED
+                PJOUT &= ~BIT3;                                                     //When suspended, turn off LED
                 __bis_SR_register(LPM3_bits + GIE);                                 //Enter LPM3 w/ interrupts
                 _NOP();
                 break;
@@ -193,7 +193,7 @@ VOID main (VOID)
                 break;
 
             case ST_NOENUM_SUSPENDED:
-                P1OUT &= ~BIT0;
+                PJOUT &= ~BIT3;
                 __bis_SR_register(LPM3_bits + GIE);
                 _NOP();
                 break;
@@ -262,6 +262,8 @@ VOID Init_Ports (VOID)
     P5DIR = 0xFF;
     P6OUT = 0x00;
     P6DIR = 0xFF;
+    PJOUT = 0x00;
+    PJDIR = 0xFF;
 /*
     P7OUT = 0x00;
     P7DIR = 0xFF;
@@ -363,6 +365,6 @@ BYTE retInString (char* string)
 #pragma vector=TIMER1_A0_VECTOR
 __interrupt void TIMER1_A0_ISR (void)
 {
-    P1OUT ^= BIT0;                                              //Toggle LED P1.0
+    PJOUT ^= BIT3;                                              //Toggle LED PJ.3
 }
 

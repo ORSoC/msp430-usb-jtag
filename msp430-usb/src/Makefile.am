@@ -1,4 +1,4 @@
-CFLAGS += -D__MSP430F5522__ -D__TI_COMPILER_VERSION__ -D__REGISTER_MODEL__ -DUSB_TAG
+CFLAGS += -D__MSP430F5510__ -D__TI_COMPILER_VERSION__ -D__REGISTER_MODEL__ -DUSB_TAG
 CFLAGS += -I$(top_srcdir)/src/USB_API/USB_CDC_API -I$(top_srcdir)/src/USB_config \
 	 -I$(top_srcdir)/src/F5xx_F6xx_Core_Lib \
 	 -ggdb -g3 -O0
