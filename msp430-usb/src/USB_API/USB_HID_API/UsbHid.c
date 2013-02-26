@@ -863,10 +863,13 @@ BYTE USBHID_intfStatus (BYTE intfNum, WORD* bytesSent, WORD* bytesReceived)
     __disable_interrupt();                                                      //disable interrupts - atomic operation
 
     //Is send operation underway?
-    if (HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft >= 0){
+    if (HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft != 0){
         ret |= kUSBHID_waitingForSend;
-        *bytesSent = HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSend -
-                     HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft;
+	if (HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft >= 0)
+		*bytesSent = HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSend -
+			HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft;
+	else
+		*bytesSent = HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSend;
     }
 
     //Is receive operation underway?
