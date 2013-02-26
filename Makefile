@@ -8,7 +8,7 @@ LDFLAGS=-mmcu=msp430f5507 -Os
 all: main usbhidmain
 
 clean:
-	-rm main usbhidmain usbhidmain.o $(USBOBJS) libusb.a
+	-rm main usbhidmain $(USBOBJS) libusb.a $(USBFWOBJS)
 
 program: usbhidmain
 	PYTHONPATH=~/msp430/python-msp430-tools python -m msp430.bsl5.hid -B -e -P $<
@@ -31,10 +31,11 @@ USBOBJS=\
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_PMM.o \
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_TLV.o \
 	usbConstructs.o usbEventHandling.o
+USBFWOBJS=usbhidmain.o jtag.o msp430-usb/USB_config/descriptors.o msp430-usb/USB_config/UsbIsr.o
 LDFLAGS += -Wl,--defsym=tSetupPacket=0x2380 -Wl,--defsym=tEndPoint0DescriptorBlock=0x0920 -Wl,--defsym=tInputEndPointDescriptorBlock=0x23C8 -Wl,--defsym=tOutputEndPointDescriptorBlock=0x2388 -Wl,--defsym=abIEP0Buffer=0x2378 -Wl,--defsym=abOEP0Buffer=0x2370
 
 libusb.a: $(USBOBJS)
 	ar rsc $@ $^
 
-usbhidmain: usbhidmain.o jtag.o msp430-usb/USB_config/descriptors.o msp430-usb/USB_config/UsbIsr.o libusb.a 
+usbhidmain: $(USBFWOBJS) libusb.a 
 
