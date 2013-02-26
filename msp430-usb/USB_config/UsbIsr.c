@@ -169,6 +169,8 @@ __interrupt VOID iUsbInterruptHandler(VOID)
     case USBVECINT_INPUT_ENDPOINT7:
       break;
     case USBVECINT_OUTPUT_ENDPOINT1:
+      break;
+    case USBVECINT_OUTPUT_ENDPOINT2:
       //call callback function if no receive operation is underway
       if (!HidIsReceiveInProgress(HID0_INTFNUM))
       {
@@ -183,8 +185,6 @@ __interrupt VOID iUsbInterruptHandler(VOID)
            bWakeUp = HidToBufferFromHost(HID0_INTFNUM);
       } 
       break;
-    case USBVECINT_OUTPUT_ENDPOINT2:
-            break;
     case USBVECINT_OUTPUT_ENDPOINT3:
       break;
     case USBVECINT_OUTPUT_ENDPOINT4:
