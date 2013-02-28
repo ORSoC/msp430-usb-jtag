@@ -114,6 +114,8 @@ void jtag_init() {
 uint8_t jtag_shift_bits(uint8_t tdi, uint8_t tms, uint8_t len) {
 	uint8_t tdo=0;
 
+	// Note: this routine handles both TMS and TDI sequences.
+	// UsbBlaster protocol does not alter TMS during byte shifts.
 	while (len--) {
 		/* Set output pins TMS and TDI */
 		uint8_t mask=0xff, set=0x00;
@@ -134,13 +136,12 @@ uint8_t jtag_shift_bits(uint8_t tdi, uint8_t tms, uint8_t len) {
 #else
 #error Unknown board!
 #endif
-		P4OUT = (P4OUT&mask)|set;
+		P4OUT = (P4OUT&mask)|set;	// Set TMS and TDI
+		tdo = (tdo>>1) | (P4IN&BIT2?0x80:0x00);	// read TDO
 		
 		/* Raise clock */
 		P4OUT |= BIT3;
 		
-		/* Read TDO */
-		tdo = (tdo>>1) | (P4IN&BIT2?0x80:0x00);
 		/* Shift the other registers */
 		tdi >>= 1;
 		tms >>= 1;
@@ -211,14 +212,14 @@ uint8_t usbblaster_byte(uint8_t fromhost) {
 #else
 #error Unknown board!
 #endif
-		return jtag_shift_bits(tms?0xff:0x00, fromhost, 8);
+		return jtag_shift_bits(fromhost, tms?0xff:0x00, 8);
 	} else {
 		usb_jtag_state.read = fromhost&0x40;
 		if (fromhost&0x80) {
 			usb_jtag_state.bytes_to_shift = fromhost&0x3f;
 			return 0;
 		} else {
-			uint8_t mask=0xff, set=0x00;
+			uint8_t mask=0xff, set=0x00, tdo;
 			if (fromhost & BIT0)  // TCK
 				set |= BIT3;
 			else
@@ -227,6 +228,7 @@ uint8_t usbblaster_byte(uint8_t fromhost) {
 				set |= BIT1;
 			else
 				mask &= ~BIT1;
+			tdo = P4IN&BIT2;    // Simultaneous in real device, we'll just read before write
 #if OLIMEXINO_5510
 			if (fromhost & BIT1)  // TMS
 				PJOUT |= BIT0;
@@ -250,7 +252,7 @@ uint8_t usbblaster_byte(uint8_t fromhost) {
 				PJOUT &= ~BIT3;
 #endif
 
-			return P4IN&BIT2?1:0;  // TDO
+			return tdo?1:0;  // TDO
 		}
 	}
 }
