@@ -74,6 +74,7 @@ BYTE retInString (char* string);
 
 volatile BYTE bHIDDataReceived_event = FALSE;   //Indicates data has been received without an open rcv operation
 volatile BYTE bTimerTripped_event = FALSE;
+volatile WORD SR_sleep = GIE;
 
 #define MAX_STR_LENGTH 64
 
@@ -85,6 +86,8 @@ unsigned int FastToggle_Period = 1000 - 1;
  */
 VOID main (VOID)
 {
+    WORD SR_sleep_next = GIE;
+
     WDTCTL = WDTPW + WDTHOLD;                                   //Stop watchdog timer
 
     Init_Ports();                                               //Init ports (do first ports because clocks do change ports)
@@ -113,7 +116,10 @@ VOID main (VOID)
         switch (USB_connectionState())
         {
             case ST_USB_DISCONNECTED:
-                __bis_SR_register(LPM3_bits + GIE);                     //Enter LPM3 w/interrupt
+		    /* FIXME SR_sleep_next decision */
+		SR_sleep_next = LPM3_bits + GIE;                     //Enter LPM3 w/interrupt
+		__bis_SR_register(SR_sleep);
+		SR_sleep = SR_sleep_next;
                 _NOP();
                 break;
 
@@ -121,8 +127,9 @@ VOID main (VOID)
                 break;
 
             case ST_ENUM_ACTIVE:
-		    //__bis_SR_register(GIE);
-		    __bis_SR_register(LPM0_bits + GIE);                                 //Enter LPM0 (can't do LPM3 when active)
+		SR_sleep_next = LPM0_bits + GIE;                                 //Enter LPM0 (can't do LPM3 when active)
+		__bis_SR_register(SR_sleep);
+		SR_sleep = SR_sleep_next;
                 _NOP();                                                             //For Debugger
 
                                                                                     //Exit LPM on USB receive and perform a receive
@@ -132,6 +139,8 @@ VOID main (VOID)
 		    int i, o, len;
                     char pieceOfString[MAX_STR_LENGTH] = "";                        //Holds the new addition to the string
                     bHIDDataReceived_event = FALSE;  // Must be before receive
+
+		    do {
 
                     len=hidReceiveDataInBuffer((BYTE*)pieceOfString,
                         MAX_STR_LENGTH,
@@ -155,6 +164,7 @@ VOID main (VOID)
 #else
 		    hidSendDataWaitTilDone((BYTE*)pieceOfString,o,HID0_INTFNUM,0);
 #endif
+		    } while (len);
                 }
 #if 1
 		else if (bTimerTripped_event) {  // Be sure to send status bytes now and then (16ms)
@@ -166,14 +176,18 @@ VOID main (VOID)
 
             case ST_ENUM_SUSPENDED:
                 PJOUT &= ~BIT3;                                                     //When suspended, turn off LED
-                __bis_SR_register(LPM3_bits + GIE);                                 //Enter LPM3 w/ interrupts
+		SR_sleep_next = LPM3_bits + GIE;
+		__bis_SR_register(SR_sleep);
+		SR_sleep = SR_sleep_next;
                 break;
 
             case ST_ENUM_IN_PROGRESS:
                 break;
 
             case ST_NOENUM_SUSPENDED:
-                __bis_SR_register(LPM3_bits + GIE);
+		SR_sleep_next = LPM3_bits + GIE;
+		__bis_SR_register(SR_sleep);
+		SR_sleep = SR_sleep_next;
                 break;
 
             case ST_ERROR:
@@ -334,6 +348,7 @@ __interrupt void TIMER1_A0_ISR (void)
 	//PJOUT ^= BIT3;                                          //Toggle LED P1.0
 	bTimerTripped_event = TRUE;
 	// Wake main thread up
+	SR_sleep &= ~LPM3_bits;
     	 __bic_SR_register_on_exit(LPM3_bits);   // Exit LPM0-3
     	 __no_operation();                       // Required for debugger
 
