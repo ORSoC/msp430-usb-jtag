@@ -21,8 +21,10 @@ swi2cmst.o: swi2cmst.c swi2cmst.h cfg.h
 
 tps65217.o: tps65217.c tps65217.h cfg.h swi2cmst.h
 
+BOARD ?= OLIMEXINO_5510
+#BOARD ?= ORSOC_SOM5C
 CPPFLAGS=-I. -Imsp430-usb -Imsp430-usb/USB_config -Imsp430-usb/src -Imsp430-usb/src/F5xx_F6xx_Core_Lib \
-	-D__REGISTER_MODEL__ -D__TI_COMPILER_VERSION__
+	-D__REGISTER_MODEL__ -D__TI_COMPILER_VERSION__ -D$(BOARD)
 USBOBJS=\
 	msp430-usb/src/USB_API/USB_Common/dma.o \
 	msp430-usb/src/USB_API/USB_Common/usb.o \
