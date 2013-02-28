@@ -73,6 +73,7 @@ VOID Init_TimerA1 (VOID);
 BYTE retInString (char* string);
 
 volatile BYTE bHIDDataReceived_event = FALSE;   //Indicates data has been received without an open rcv operation
+volatile BYTE bTimerTripped_event = FALSE;
 
 #define MAX_STR_LENGTH 64
 
@@ -84,8 +85,6 @@ unsigned int FastToggle_Period = 1000 - 1;
  */
 VOID main (VOID)
 {
-	uint8_t usbfn=0;
-
     WDTCTL = WDTPW + WDTHOLD;                                   //Stop watchdog timer
 
     Init_Ports();                                               //Init ports (do first ports because clocks do change ports)
@@ -110,7 +109,6 @@ VOID main (VOID)
     __enable_interrupt();                           //Enable interrupts globally
     while (1)
     {
-        BYTE i;
         //Check the USB state and directly main loop accordingly
         switch (USB_connectionState())
         {
@@ -123,8 +121,8 @@ VOID main (VOID)
                 break;
 
             case ST_ENUM_ACTIVE:
-		    __bis_SR_register(GIE);
-		    //__bis_SR_register(LPM0_bits + GIE);                                 //Enter LPM0 (can't do LPM3 when active)
+		    //__bis_SR_register(GIE);
+		    __bis_SR_register(LPM0_bits + GIE);                                 //Enter LPM0 (can't do LPM3 when active)
                 _NOP();                                                             //For Debugger
 
                                                                                     //Exit LPM on USB receive and perform a receive
@@ -133,12 +131,12 @@ VOID main (VOID)
                                                                                     //command
 		    int i, o, len;
                     char pieceOfString[MAX_STR_LENGTH] = "";                        //Holds the new addition to the string
+                    bHIDDataReceived_event = FALSE;  // Must be before receive
 
                     len=hidReceiveDataInBuffer((BYTE*)pieceOfString,
                         MAX_STR_LENGTH,
                         HID0_INTFNUM);                                              //Get the next piece of the string
 
-                    bHIDDataReceived_event = FALSE;
 
 		    o = 0;
 		    for (i=0; i<len; i++) {
@@ -159,10 +157,9 @@ VOID main (VOID)
 #endif
                 }
 #if 1
-		if (TA1R>>15 != usbfn /*usbfn != USBFN & 0x80*/) {  // Be sure to send status bytes now and then (16ms)
-			hidSendDataWaitTilDone((void*)&usbfn,0,HID0_INTFNUM,0);
-			//usbfn = USBFN & 0xf0;
-			usbfn = TA1R>>15;
+		else if (bTimerTripped_event) {  // Be sure to send status bytes now and then (16ms)
+			bTimerTripped_event = FALSE;
+			hidSendDataWaitTilDone(0,0,HID0_INTFNUM,0);
 		}
 #endif
                 break;
@@ -230,32 +227,38 @@ VOID Init_Clock (VOID)
  */
 VOID Init_Ports (VOID)
 {
-    //Initialization of ports (all unused pins as outputs with low-level
-    P1OUT = 0x00;
+    //Initialization of ports
+#if OLIMEXINO_5510
+    // P1 goes to Arduino D2..D9. Unused pins are set output low.
+    P1OUT = 0x00;	
     P1DIR = 0xFF;
-	P2OUT = 0x00;
-    P2DIR = 0xFF;
-    P3OUT = 0x00;
-    P3DIR = 0xFF;
-    P4OUT = 0x00;
-    P4DIR = 0xFF;
+    // P2 has only a button; enable it
+    P2OUT = 1;
+    P2DIR = 0;
+    P2REN = 1;
+    // P3 is absent
+    //P3OUT = 0x00;
+    //P3DIR = 0xFF;
+    // P4 has JTAG (1..3), UART (4,5) and I²C (6,7)
+    // Also connects to arduino D0,D1,D10..D13
+    P4OUT = 0b00110010;
+    P4DIR = 0b00011011;
+    // P5 has 6 pins, 4 used for crystals and 2 arduino A5,A4
     P5OUT = 0x00;
     P5DIR = 0xFF;
+    // P6 has 4 pins, A3..A0, also connected for battery measure on A3
     P6OUT = 0x00;
     P6DIR = 0xFF;
-    PJOUT = 0x00;
-    PJDIR = 0xff;
-#if defined(__MSP430F552x) || defined(__MSP430F563x_F663x)
-    P7OUT = 0x00;
-    P7DIR = 0xFF;
-    P8OUT = 0x00;
-    P8DIR = 0xFF;
-    #if defined (__MSP430F563x_F663x)
-    P9OUT = 0x00;
-    P9DIR = 0xFF;
-    #endif
-#endif
+    // PJ has LED1, BAT_SENSE_E, UEXT_PWR_E and #UEXT_CS (used for TMS)
+    PJOUT = 0b0001;
+    PJDIR = 0b1111;
     jtag_init();
+    // Make sure our UEXT pins don't burn things, hopefully
+    P4DS = 0;
+    PJDS = 0;
+#else
+#error Unknown board!
+#endif
 }
 
 /*  
@@ -292,8 +295,9 @@ __interrupt VOID UNMI_ISR (VOID)
  */
 VOID Init_TimerA1 (VOID)
 {
+	TA1CCR0 = 0x1000;  // TODO: decide on frequency
     TA1CCTL0 = CCIE;                                        //CCR0 interrupt enabled
-    TA1CTL = TASSEL_1 + TACLR | MC__CONTINUOUS;                              //ACLK, clear TAR
+    TA1CTL = TASSEL_1 + TACLR + MC__UP;                              //ACLK, clear TAR
 }
 
 /*  
@@ -327,5 +331,10 @@ BYTE retInString (char* string)
 #pragma vector=TIMER1_A0_VECTOR
 __interrupt void TIMER1_A0_ISR (void)
 {
-    PJOUT ^= BIT3;                                          //Toggle LED P1.0
+	//PJOUT ^= BIT3;                                          //Toggle LED P1.0
+	bTimerTripped_event = TRUE;
+	// Wake main thread up
+    	 __bic_SR_register_on_exit(LPM3_bits);   // Exit LPM0-3
+    	 __no_operation();                       // Required for debugger
+
 }

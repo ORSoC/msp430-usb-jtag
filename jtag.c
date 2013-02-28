@@ -77,15 +77,24 @@
 
 void jtag_init() {
 	/* We need to fall back to GPIO for bit or TMS transfers */
+#if OLIMEXINO_5510
+	PJOUT |= BIT0;   // TMS on #UEXT_CS PJ.0
+	PJDIR |= BIT0 | BIT3;  // LED on PJ.3
+	P4OUT = (P4OUT&0b11110001)|0b0010;
+	P4DIR = (P4DIR&0b11110001)|0b1010;
+	P4REN &= 0b11110001;
+	// P4DS &= 0b11110000;
+	P4SEL &= 0b11110001;
+#elif ORSOC_SOM5C
 	P4OUT = (P4OUT&0b11110000)|0b0011;
 	P4DIR = (P4DIR&0b11110000)|0b1011;
 	P4REN &= 0b11110000;
 	// P4DS &= 0b11110000;
 	P4SEL &= 0b11110000;
+#else
+#error Unknown board!
+#endif
 	/* Could perhaps enable a pullup on TDO in case nothing is connected. */
-
-	/* LED on PJ3 */
-	PJDIR |= BIT3;
 
 	/* Set up USCI to do large data shifts */
 	UCB1CTL1 = UCSWRST;  // disable/reset for configuration
@@ -95,6 +104,9 @@ void jtag_init() {
 	//UCB1STAT = 0;
 	UCB1IE = 0;
 	UCB1CTL1 = UCSSEL1 | UCSWRST; // keep in reset until used
+
+	usb_jtag_state.bytes_to_shift = 0;
+	usb_jtag_state.read = 0;
 }
 
 /* Shift up to 8 bits on both TMS and TDI, reading TDO.
@@ -109,10 +121,19 @@ uint8_t jtag_shift_bits(uint8_t tdi, uint8_t tms, uint8_t len) {
 			set |= BIT1;
 		else
 			mask &= ~BIT1;
+#if ORSOC_SOM5C
 		if (tms&1)
 			set |= BIT0;
 		else
 			mask &= ~BIT0;
+#elif OLIMEXINO_5510
+		if (tms&1)
+			PJOUT |= BIT0;
+		else
+			PJOUT &= ~BIT0;
+#else
+#error Unknown board!
+#endif
 		P4OUT = (P4OUT&mask)|set;
 		
 		/* Raise clock */
@@ -171,97 +192,6 @@ void jtag_shift_bytes_finish() {
 	jtag_spi_off();
 }
 
-void jtag_just_clock(uint16_t count) {
-	while (count--) {
-		/* Raise clock */
-		P4OUT |= BIT3;
-		/* Lower clock */
-		P4OUT &= ~BIT3;
-	}
-}
-
-// shift through a wide register and check one bit (e.g. CONF_DONE)
-bool jtag_check_one_bit(int16_t total, int16_t ourbit) {
-	bool bit=false;
-
-	while (total>0) {
-		uint8_t tdo;
-		tdo = jtag_shift_bits(0x00, 0x00, total>8?8:total);
-		if (ourbit>=0 && ourbit<8)
-			bit = (tdo>>ourbit)&1;
-		ourbit-=8;
-		total-=8;
-	}
-	return bit;
-}
-
-#if 0
-/* Routine (almost) replicating the SVF behaviour. Intend to replace this with 
-   XSVF player/executor instead, to make the code less specialised. */
-bool configure_cyclonev() {
-	uint8_t *rbfdata;
-	uint16_t rbflen;
-	bool success=false;
-	
-	readrbf(&rbfdata, &rbflen);
-
-	/* Reset JTAG bus */
-	jtag_init();
-	/* Move through JTAG state machine to test-logic-reset */
-	jtag_shift_bits(0xff, 0xff, 8);   // STATE RESET;
-	/* TODO: identify devices on chain */
-
-	// SIR 10 TDI (002);
-	/* move: (reset)-idle-seldr-selir-capir-shiftir */
-	jtag_shift_bits(0xff, 0b00110, 5);
-	/* Load instruction for configuration - 10'b0000000010 */
-	jtag_shift_bits(0b00000010, 0b00000000, 8);
-	jtag_shift_bits(0b1100, 0b0110, 4); // 2 bits, -exit1ir-updateir-run/idle
-
-	// equivalent to RUNTEST IDLE 25000 TCK ENDSTATE IDLE;
-	jtag_just_clock(25000);  // allow fpga to reset itself before configuration
-
-	// Load bitstream via DR
-	// (idle)-seldr-capdr-shiftdr
-	jtag_shift_bits(0xff, 0b001, 3);  // Move into shift-DR
-
-	while (rbflen) {
-		// TODO: double-buffer so we can read while working
-		jtag_shift_bytes_start(rbfdata,rbfdata,rbflen);
-		jtag_shift_bytes_finish();
-		readrbf(&rbfdata, &rbflen);
-	}
-
-	// TODO: runtest uses the last state specified in runtest, not the current state.
-	// Also, check RBF vs jtag bitstream format. Probably identical when uncompressed..
-	// but certainly backwards in SVF. Also, bitswapping occurs for rbf to spi flash.
-	// is bit order preserved?
-	// Sample RBF (compressed, so not good example): 
-	//     ..11111011010101111011111110111 (msb first)
-	// or  ..11111010101101110111111101111 (lsb first)
-	// SVF ..11111010101101111111111111111  Quite possibly LSB first sync pattern+compr flag.
-	// Length of initial 1s stream differs.
-
-	// Check CONF_DONE via internal scan to verify bitstream
-	// SIR 10 TDI (004);  (shiftdr)-1exit1dr-1updatedr-1seldr-1selir-0capir-0shiftir
-	jtag_shift_bits(0xff, 0b001111, 6);  // move into shift-IR
-	jtag_shift_bits(0x04, 0x00, 8);  // low 8 bits of IR
-	jtag_shift_bits(0x00, 0b010, 3);  // move to IRPAUSE (per ENDIR IRPAUSE);
-	jtag_just_clock(125);  // RUNTEST 125 TCK;
-
-	// SDR widh masked tdo check
-	jtag_shift_bits(0xff, 0b00111, 5);  // (IRPAUSE)-1exit2ir-1updateir-1seldr-0capdr-0shiftdr
-	success=jtag_check_one_bit(732,286);  // bit 286 for EP4CE22 .. need to update for Cyclone V
-	
-	// Finally, instructions 3 and 3ff are shifted in to run user mode and set to bypass
-	// (shiftdr)-1exit1dr-1updatedr-1seldr-1selir-0capir-0shiftir
-	jtag_shift_bits(0xff, 0b001111, 6);  // move to shiftir
-	jtag_shift_bits(0x03, 0x00, 8);    // instruction 10'h003, low 8 bits
-	jtag_shift_bits(0x00, 0b10, 2);    // high 2 bits... FIXME: not finished.
-	// May never be, as XSVF would be a cleaner choice.
-}
-#endif
-
 struct usbblaster_state /* {
 	//uint8_t *bytes_in, *bytes_out;
 	uint8_t bytes_to_shift, read;
@@ -272,8 +202,16 @@ struct usbblaster_state /* {
 // The return value should be send to host if .read unless .bytes_to_shift went from 0 to non-0
 uint8_t usbblaster_byte(uint8_t fromhost) {
 	if (usb_jtag_state.bytes_to_shift) {
+		uint8_t tms;
 		usb_jtag_state.bytes_to_shift--;
-		return jtag_shift_bits(P4OUT&BIT0?0xff:0x00, fromhost, 8);
+#if ORSOC_SOM5C
+		tms = P4OUT&BIT0;
+#elif OLIMEXINO_5510
+		tms = PJOUT&BIT0;
+#else
+#error Unknown board!
+#endif
+		return jtag_shift_bits(tms?0xff:0x00, fromhost, 8);
 	} else {
 		usb_jtag_state.read = fromhost&0x40;
 		if (fromhost&0x80) {
@@ -285,21 +223,32 @@ uint8_t usbblaster_byte(uint8_t fromhost) {
 				set |= BIT3;
 			else
 				mask &= ~BIT3;
+			if (fromhost & BIT4)  // TDI
+				set |= BIT1;
+			else
+				mask &= ~BIT1;
+#if OLIMEXINO_5510
+			if (fromhost & BIT1)  // TMS
+				PJOUT |= BIT0;
+			else
+				PJOUT &= ~BIT0;
+#elif ORSOC_SOM5C
 			if (fromhost & BIT1)  // TMS
 				set |= BIT0;
 			else
 				mask &= ~BIT0;
-			if (fromhost & BIT1)  // TDI
-				set |= BIT1;
-			else
-				mask &= ~BIT1;
+#else
+#error Unknown board!
+#endif
 
 			P4OUT = (P4OUT&mask)|set;
 
+#if OLIMEXINO_5510
 			if (fromhost & BIT5)	// LED
 				PJOUT |= BIT3;
 			else
 				PJOUT &= ~BIT3;
+#endif
 
 			return P4IN&BIT2?1:0;  // TDO
 		}
