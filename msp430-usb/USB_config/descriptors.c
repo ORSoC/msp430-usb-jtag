@@ -227,8 +227,8 @@ const struct tUsbHandle stUsbHandle[]=
         HID_CLASS,
         0,
         0,
-        OEP1_X_BUFFER_ADDRESS,
-        OEP1_Y_BUFFER_ADDRESS,
+        OEP2_X_BUFFER_ADDRESS,
+        OEP2_Y_BUFFER_ADDRESS,
         IEP1_X_BUFFER_ADDRESS,
         IEP1_Y_BUFFER_ADDRESS
     }

@@ -98,8 +98,8 @@ void jtag_init() {
 
 	/* Set up USCI to do large data shifts */
 	UCB1CTL1 = UCSWRST;  // disable/reset for configuration
-	/* UCCKPH=0, UCCKPL=0, LSB first, 8-bit, master, 3-pin SPI */
-	UCB1CTL0 = UCMST | UCMODE_0 | UCSYNC;
+	/* LSB first, 8-bit, master, 3-pin SPI */
+	UCB1CTL0 = UCCKPH | UCMST | UCMODE_0 | UCSYNC;
 	UCB1BRW = 1; /* maximum bit rate */
 	//UCB1STAT = 0;
 	UCB1IE = 0;
@@ -188,8 +188,9 @@ void jtag_shift_bytes_start(const uint8_t *bytes_out, uint8_t *bytes_in, uint16_
 
 void jtag_shift_bytes_finish() {
 	/* Await the transfer to finish then switch back to GPIO */
-	while ((DMA0CTL|DMA1CTL) & DMAEN)
+	while ((DMA0CTL|DMA1CTL) & DMAEN) {
 		/* Wait for DMA to finish */;
+	}
 	jtag_spi_off();
 }
 
@@ -255,4 +256,32 @@ uint8_t usbblaster_byte(uint8_t fromhost) {
 			return tdo?1:0;  // TDO
 		}
 	}
+}
+
+/* Process data in a buffer. Returns the size of data that should be sent back to host. */
+/* TODO: extend for fully asynchronous operation. */
+int usbblaster_process_buffer(uint8_t *buf, int len) {
+	int i=0, o=0;
+
+	while (i<len) {
+		uint8_t bts=usb_jtag_state.bytes_to_shift, ret;
+
+		if (bts==0) {  // bitbang / command byte
+			ret=usbblaster_byte(buf[i++]);
+			if (usb_jtag_state.read &&
+			    !(usb_jtag_state.bytes_to_shift && !bts)) {
+				buf[o++]=ret;
+			}
+		} else {  // Byte shift mode, use the SPI with DMA
+			ret=len-i>bts ? bts : len-i;  // Size of data that can be shifted directly
+			jtag_shift_bytes_start(buf+i, buf+o, ret);
+			jtag_shift_bytes_finish();
+			if (usb_jtag_state.read)
+				o+=ret;
+			i+=ret;
+			usb_jtag_state.bytes_to_shift-=ret;
+		}
+	}
+
+	return o;
 }

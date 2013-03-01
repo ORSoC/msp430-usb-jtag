@@ -146,16 +146,8 @@ VOID main (VOID)
                         MAX_STR_LENGTH,
                         HID0_INTFNUM);                                              //Get the next piece of the string
 
+		    o = usbblaster_process_buffer(pieceOfString, len);
 
-		    o = 0;
-		    for (i=0; i<len; i++) {
-			    uint8_t bts=usb_jtag_state.bytes_to_shift, ret;
-			    ret=usbblaster_byte(pieceOfString[i]);
-			    if (usb_jtag_state.read &&
-				!(usb_jtag_state.bytes_to_shift && !bts)) {
-				    pieceOfString[o++]=ret;
-			    }
-		    }
                                                                                     //Add it to the whole
 #if 0 /* InBackground expects the buffer to remain unchanged */
                     hidSendDataInBackground((BYTE*)pieceOfString,

@@ -7,3 +7,4 @@ extern struct usbblaster_state {
 // The return value should be send to host if .read unless .bytes_to_shift went from 0 to non-0
 uint8_t usbblaster_byte(uint8_t fromhost);
 void jtag_init(void);
+int usbblaster_process_buffer(uint8_t *buf, int len);

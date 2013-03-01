@@ -55,7 +55,11 @@ extern "C"
 
 // Configuration Constants that can change
 // #define that relates to Device Descriptor
+#if 1  /* Altera */
 #define USB_VID               0x09fb        // Vendor ID (VID)
+#else  /* FTDI */
+#define USB_VID 0x0403
+#endif
 #define USB_PID               0x6001        // Product ID (PID)
 /*----------------------------------------------------------------------------+
 | Firmware Version                                                            |
@@ -102,7 +106,7 @@ extern "C"
 #define USB_DISABLE_XT_SUSPEND 1             // If non-zero, then USB_suspend() will disable the oscillator
                                              // that is designated by USB_PLL_XT; if zero, USB_suspend won't
                                              // affect the oscillator
-#define USB_DMA_CHAN             0x00        // Set to 0xFF if no DMA channel will be used 0..7 for selected DMA channel
+#define USB_DMA_CHAN             0x02        // Set to 0xFF if no DMA channel will be used 0..7 for selected DMA channel
 
 
 
