@@ -241,12 +241,33 @@ BYTE usbSetVendor(VOID) {
 	return (FALSE);
 }
 
+BYTE usbDisconnectThenBSL(VOID) {
+	volatile long i;
+	/* Just acknowledge the data without using it */
+        usbSendZeroLengthPacketOnIEP0();
+	/* Shut down USB contact - TODO: de-enumerate? */
+	USB_disable();
+	/* Stop DMA units so they can't interfere with BSL */
+	DMA0CTL = DMA1CTL = DMA2CTL = 0;
+	/* Wait to make sure host sees we're gone */
+	for (i=0; i<USB_MCLK_FREQ/2; i++);
+	/* Start BSL */
+	void (*BSL)(void) = (void*)0x1000;
+	BSL();
+	return (FALSE);
+}
+
 const tDEVICE_REQUEST_COMPARE tUsbRequestList[] = 
 {
 	/* Vendor specific requests - sent for FTDI chip */
 	USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_CLASS | USB_REQ_TYPE_DEVICE, 0,
 	0,0, 0,0, 0,0,
 	0x80, &usbSetVendor,
+	// Huawei style mode switch - jump to bootloader
+	USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
+	USB_REQ_SET_FEATURE, PUTWORD(1), PUTWORD(0), PUTWORD(0),
+	0xff, &usbDisconnectThenBSL,
+	
 #if 0
     //---- HID 0 Class Requests -----//
     USB_REQ_TYPE_INPUT | USB_REQ_TYPE_CLASS | USB_REQ_TYPE_INTERFACE,
