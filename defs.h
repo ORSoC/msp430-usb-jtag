@@ -78,7 +78,7 @@
 #define PWR_EN_PDIR     P6DIR
 #define PWR_EN_POUT     P6OUT
 #define PWR_EN_PINP     P6INP
-#define PWR_EN_PBIT     BIT3
+#define PWR_EN_PBIT     BIT2
 
 #define PWR_EN_INIT     ((PWR_EN_PDIR) |=  (PWR_EN_PBIT)) // Set output direction
 #define PWR_EN_OFF      ((PWR_EN_POUT) &= ~(PWR_EN_PBIT))
@@ -95,7 +95,8 @@
 //#define LED_AVAIL     0 // TODO: uncomment
 
 // TODO: Remove the following temporary LED_ defines
-#define LED_AVAIL       1
+#define LED_AVAIL       0
+#if LED_AVAIL
 #define LED_PDIR        PJDIR
 #define LED_POUT        PJOUT
 #define LED_PBIT        BIT3
@@ -106,13 +107,21 @@
 #define LED_TOGGLE      (LED_POUT ^=  LED_PBIT)
 #define LED_FLASH_TIME  20000
 #define LED_FLASH_PAUSE 4
+#else
+#define LED_ON	/* missing */
+#define LED_OFF	/* missing */
+#define LED_INIT	/* missing */
+#define LED_TOGGLE	/* missing */
+#define LED_FLASH_TIME	0
+#define LED_FLASH_PAUSE	0
+#endif
 
 #define PWR_EN_AVAIL    1
 #define PWR_EN_PSEL     P6SEL
 #define PWR_EN_PDIR     P6DIR
 #define PWR_EN_POUT     P6OUT
 #define PWR_EN_PINP     P6INP
-#define PWR_EN_PBIT     BIT3
+#define PWR_EN_PBIT     BIT2
 
 #define PWR_EN_INIT     ((PWR_EN_PDIR) |=  (PWR_EN_PBIT)) // Set output direction
 #define PWR_EN_OFF      ((PWR_EN_POUT) &= ~(PWR_EN_PBIT))
