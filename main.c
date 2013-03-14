@@ -136,74 +136,71 @@ unsigned int boardInitOrdb3a(void)
 	unsigned char chipRev;
 	unsigned int result;
 
-	swi2cmst_init();
-	swi2cmst_clrbus();
-	result = tps65217_chipId(&chipId);
-	if(result == TPS65217_OK) {
-		chipRev = chipId & 0x0F;
-		chipNum = chipId >> 4;
-		if(chipNum != TPS65217A && chipNum != TPS65217B) {
-			result = TPS65217_ERROR;
-		}
-	}
-
+	PWR_EN_OFF;	// Critical; output level is undefined at startup in msp430!
 	PWR_EN_INIT;
-	PWR_EN_OFF;
 
-    // TODO: Check if there are power sequncing requirements
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFDCDC1);
-	result |= tps65217_wrReg(TPS65217_DEFDCDC1, TPS65217_DEFDCDC_1V5);
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFDCDC1);
-	result |= tps65217_wrReg(TPS65217_DEFDCDC1, TPS65217_DEFDCDC_1V5);
+	do {
+		LED_OFF;
+		swi2cmst_init();
+		swi2cmst_clrbus();
+		result = tps65217_chipId(&chipId);
+		if(result == TPS65217_OK) {
+			chipRev = chipId & 0x0F;
+			chipNum = chipId >> 4;
+			if(chipNum != TPS65217A && chipNum != TPS65217B) {
+				result = TPS65217_ERROR;
+				continue;
+			}
+		} else {
+			continue;
+		}
 
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFDCDC2);
-	result |= tps65217_wrReg(TPS65217_DEFDCDC2, TPS65217_DEFDCDC_3V3);
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFDCDC2);
-	result |= tps65217_wrReg(TPS65217_DEFDCDC2, TPS65217_DEFDCDC_3V3);
+		// TODO: Check if there are power sequncing requirements
+		/* Macro to set a level 2 password-protected register, read back and verify */
+#define SET_TPS_REG_PW2(reg,val) { unsigned char rv;			\
+			result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^(reg)); \
+			result |= tps65217_wrReg(reg, val);		\
+			result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^(reg)); \
+			result |= tps65217_wrReg(reg, val);		\
+			result |= tps65217_rdReg(reg, &rv);		\
+			if (rv != (val)) continue;			\
+		}
 
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFDCDC3);
-	result |= tps65217_wrReg(TPS65217_DEFDCDC3, TPS65217_DEFDCDC_1V1);
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFDCDC3);
-	result |= tps65217_wrReg(TPS65217_DEFDCDC3, TPS65217_DEFDCDC_1V1);
+		SET_TPS_REG_PW2(TPS65217_DEFDCDC1, TPS65217_DEFDCDC_1V5);
+		SET_TPS_REG_PW2(TPS65217_DEFDCDC2, TPS65217_DEFDCDC_3V3);
+		SET_TPS_REG_PW2(TPS65217_DEFDCDC3, TPS65217_DEFDCDC_1V1);
+		SET_TPS_REG_PW2(TPS65217_DEFLDO1, TPS65217_DEFLDO_3V3);
+		SET_TPS_REG_PW2(TPS65217_DEFLDO2, TPS65217_DEFLDO_1V1);
+		SET_TPS_REG_PW2(TPS65217_DEFLS1, TPS65217_DEFLS_LDO | TPS65217_DEFLS_2V5);
+		SET_TPS_REG_PW2(TPS65217_DEFLS2, TPS65217_DEFLS_LS | TPS65217_DEFLS_3V3);
 
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFLDO1);
-	result |= tps65217_wrReg(TPS65217_DEFLDO1,  TPS65217_DEFLDO_3V3);
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFLDO1);
-	result |= tps65217_wrReg(TPS65217_DEFLDO1,  TPS65217_DEFLDO_3V3);
+		/* Now that all the voltages are set, we might want to turn the power on. */
 
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFLDO2);
-	result |= tps65217_wrReg(TPS65217_DEFLDO2,  TPS65217_DEFLDO_1V1);
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFLDO2);
-	result |= tps65217_wrReg(TPS65217_DEFLDO2,  TPS65217_DEFLDO_1V1);
-
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFLS1);
-	result |= tps65217_wrReg(TPS65217_DEFLS1,   TPS65217_DEFLS_LDO | TPS65217_DEFLS_2V5);
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFLS1);
-	result |= tps65217_wrReg(TPS65217_DEFLS1,   TPS65217_DEFLS_LDO | TPS65217_DEFLS_2V5);
-
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFLS2);
-	result |= tps65217_wrReg(TPS65217_DEFLS2,   TPS65217_DEFLS_LS | TPS65217_DEFLS_3V3);
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFLS2);
-	result |= tps65217_wrReg(TPS65217_DEFLS2,   TPS65217_DEFLS_LS | TPS65217_DEFLS_3V3);
-
+		/* Copy the new values into active registers for all regulators */
+		/* No readback here, because the GO bit autoclears */
 	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFSLEW);
 	result |= tps65217_wrReg(TPS65217_DEFSLEW,  TPS65217_DEFSLEW_GO | TPS65217_DEFSLEW_FAST);
 	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_DEFSLEW);
 	result |= tps65217_wrReg(TPS65217_DEFSLEW,  TPS65217_DEFSLEW_GO | TPS65217_DEFSLEW_FAST);
 
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_ENABLE);
-	result |= tps65217_wrReg(TPS65217_ENABLE,   TPS65217_ENABLE_LS2_EN);
-	result |= tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_ENABLE);
-	result |= tps65217_wrReg(TPS65217_ENABLE,   TPS65217_ENABLE_LS2_EN);
+	/* TODO: at this point, the MSP430 power voltage rises from 1.8V to 3.3V. Scale other 
+	   functions? */
+
+	/* Enable lines: FIXME use sequencer? */
+	/* Sequencer will power up all other rails, just turn on uC and VBUS */
+	SET_TPS_REG_PW2(TPS65217_ENABLE, TPS65217_ENABLE_LDO1_EN | TPS65217_ENABLE_LS2_EN);
+	// USB should be possible from here
 
 	// TODO: Fix: It seems like the TP265217 hangs here, with both SCL and SDA low.
 	//       This was found with a quick measurement, which may be inaccurate.
 
 	// TODO: Set sequencing registers
 
-	PWR_EN_ON;
+		PWR_EN_ON;	// At this point, PM chip will power up all the other rails
+		LED_ON;  // power management chip detected, so far so good
 
 	//TODO: init FPGA;
+	} while (0);
 
 	return result;
 }
