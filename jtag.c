@@ -85,7 +85,7 @@ void jtag_init() {
 	P4REN &= 0b11110001;
 	// P4DS &= 0b11110000;
 	P4SEL &= 0b11110001;
-#elif ORSOC_SOM5C
+#elif ORDB3A
 	P4OUT = (P4OUT&0b11110000)|0b0011;
 	P4DIR = (P4DIR&0b11110000)|0b1011;
 	P4REN &= 0b11110000;
@@ -123,7 +123,7 @@ uint8_t jtag_shift_bits(uint8_t tdi, uint8_t tms, uint8_t len) {
 			set |= BIT1;
 		else
 			mask &= ~BIT1;
-#if ORSOC_SOM5C
+#if ORDB3A
 		if (tms&1)
 			set |= BIT0;
 		else
@@ -206,7 +206,7 @@ uint8_t usbblaster_byte(uint8_t fromhost) {
 	if (usb_jtag_state.bytes_to_shift) {
 		uint8_t tms;
 		usb_jtag_state.bytes_to_shift--;
-#if ORSOC_SOM5C
+#if ORDB3A
 		tms = P4OUT&BIT0;
 #elif OLIMEXINO_5510
 		tms = PJOUT&BIT0;
@@ -235,7 +235,7 @@ uint8_t usbblaster_byte(uint8_t fromhost) {
 				PJOUT |= BIT0;
 			else
 				PJOUT &= ~BIT0;
-#elif ORSOC_SOM5C
+#elif ORDB3A
 			if (fromhost & BIT1)  // TMS
 				set |= BIT0;
 			else
