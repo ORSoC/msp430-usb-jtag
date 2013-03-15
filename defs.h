@@ -123,7 +123,12 @@
 #define PWR_EN_PINP     P6INP
 #define PWR_EN_PBIT     BIT2
 
-#define PWR_EN_INIT     ((PWR_EN_PDIR) |=  (PWR_EN_PBIT)) // Set output direction
+#define PWR_EN_INIT	do {			\
+		P6DIR &= ~PWR_EN_PBIT;		\
+		P6OUT &= ~PWR_EN_PBIT;		\
+		P6REN |= PWR_EN_PBIT;		\
+	} while(0)
+//#define PWR_EN_INIT     ((PWR_EN_PDIR) |=  (PWR_EN_PBIT)) // Set output direction
 #define PWR_EN_OFF      ((PWR_EN_POUT) &= ~(PWR_EN_PBIT))
 #define PWR_EN_ON       ((PWR_EN_POUT) |=  (PWR_EN_PBIT))
 
