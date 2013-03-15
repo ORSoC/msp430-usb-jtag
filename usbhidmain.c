@@ -66,6 +66,9 @@
 #include "usbConstructs.h"
 
 #include "jtag.h"
+#include "safesleep.h"
+
+extern unsigned int boardInit(void);
 
 VOID Init_Ports (VOID);
 VOID Init_Clock (VOID);
@@ -74,7 +77,6 @@ BYTE retInString (char* string);
 
 volatile BYTE bHIDDataReceived_event = FALSE;   //Indicates data has been received without an open rcv operation
 volatile BYTE bTimerTripped_event = FALSE;
-volatile WORD SR_sleep = GIE;
 
 #define MAX_STR_LENGTH 64
 
@@ -86,14 +88,12 @@ unsigned int FastToggle_Period = 1000 - 1;
  */
 VOID main (VOID)
 {
-    WORD SR_sleep_next = GIE;
-
     WDTCTL = WDTPW + WDTHOLD;                                   //Stop watchdog timer
 
     Init_Ports();                                               //Init ports (do first ports because clocks do change ports)
     SetVCore(3);
     Init_Clock();                                               //Init clocks
-	
+
     USB_init();                                 //init USB
     Init_TimerA1();
 
@@ -109,6 +109,7 @@ VOID main (VOID)
         USB_handleVbusOnEvent();
     }
 
+    init_sleep(LPM0_bits);
     __enable_interrupt();                           //Enable interrupts globally
     while (1)
     {
@@ -117,9 +118,8 @@ VOID main (VOID)
         {
             case ST_USB_DISCONNECTED:
 		    /* FIXME SR_sleep_next decision */
-		SR_sleep_next = LPM3_bits + GIE;                     //Enter LPM3 w/interrupt
-		__bis_SR_register(SR_sleep);
-		SR_sleep = SR_sleep_next;
+		    set_sleep_mode(/*LPM3_bits*/LPM0_bits);
+		    enter_sleep();
                 _NOP();
                 break;
 
@@ -127,9 +127,8 @@ VOID main (VOID)
                 break;
 
             case ST_ENUM_ACTIVE:
-		SR_sleep_next = LPM0_bits + GIE;                                 //Enter LPM0 (can't do LPM3 when active)
-		__bis_SR_register(SR_sleep);
-		SR_sleep = SR_sleep_next;
+		    set_sleep_mode(LPM0_bits);
+		    enter_sleep();
                 _NOP();                                                             //For Debugger
 
                                                                                     //Exit LPM on USB receive and perform a receive
@@ -148,7 +147,7 @@ VOID main (VOID)
 
 		    o = usbblaster_process_buffer(pieceOfString, len);
 
-                                                                                    //Add it to the whole
+		    if (o) {
 #if 0 /* InBackground expects the buffer to remain unchanged */
                     hidSendDataInBackground((BYTE*)pieceOfString,
                         o,HID0_INTFNUM,0);                      //Echoes back the characters received (needed
@@ -156,6 +155,7 @@ VOID main (VOID)
 #else
 		    hidSendDataWaitTilDone((BYTE*)pieceOfString,o,HID0_INTFNUM,0);
 #endif
+		    }
 		    } while (len);
                 }
 #if 1
@@ -168,18 +168,16 @@ VOID main (VOID)
 
             case ST_ENUM_SUSPENDED:
                 PJOUT &= ~BIT3;                                                     //When suspended, turn off LED
-		SR_sleep_next = LPM3_bits + GIE;
-		__bis_SR_register(SR_sleep);
-		SR_sleep = SR_sleep_next;
+		set_sleep_mode(LPM0_bits);
+		enter_sleep();
                 break;
 
             case ST_ENUM_IN_PROGRESS:
                 break;
 
             case ST_NOENUM_SUSPENDED:
-		SR_sleep_next = LPM3_bits + GIE;
-		__bis_SR_register(SR_sleep);
-		SR_sleep = SR_sleep_next;
+		set_sleep_mode(LPM0_bits);
+		enter_sleep();
                 break;
 
             case ST_ERROR:
@@ -198,11 +196,17 @@ VOID Init_Clock (VOID)
 {
     //Initialization of clock module
     if (USB_PLL_XT == 2){
+#if OLIMEXINO_5510
 		#if defined (__MSP430F552x) || defined (__MSP430F550x)
 			P5SEL |= 0x0C;                                      //enable XT2 pins for F5529
 		#elif defined (__MSP430F563x_F663x)
 			P7SEL |= 0x0C;
 		#endif
+#elif ORDB3A
+			P5SEL |= BIT2;	// External oscillator, we do not need XT2OUT
+#else
+# error unknown board
+#endif
 
         //use REFO for FLL and ACLK
         UCSCTL3 = (UCSCTL3 & ~(SELREF_7)) | (SELREF__REFOCLK);
@@ -211,7 +215,13 @@ VOID Init_Clock (VOID)
         //MCLK will be driven by the FLL (not by XT2), referenced to the REFO
         Init_FLL_Settle(USB_MCLK_FREQ / 1000, USB_MCLK_FREQ / 32768);   //Start the FLL, at the freq indicated by the config
                                                                         //constant USB_MCLK_FREQ
+#ifdef OLIMEXINO_5510
         XT2_Start(XT2DRIVE_0);                                          //Start the "USB crystal"
+#elif ORDB3A
+	XT2_Bypass();
+#else
+#error What sort of clock?
+#endif
     } 
 	else {
 		#if defined (__MSP430F552x) || defined (__MSP430F550x)
@@ -233,6 +243,9 @@ VOID Init_Clock (VOID)
  */
 VOID Init_Ports (VOID)
 {
+    // Set up voltages using external PM chip
+    boardInit();
+
     //Initialization of ports
 #if OLIMEXINO_5510
     // P1 goes to Arduino D2..D9. Unused pins are set output low.
@@ -258,6 +271,38 @@ VOID Init_Ports (VOID)
     // PJ has LED1, BAT_SENSE_E, UEXT_PWR_E and #UEXT_CS (used for TMS)
     PJOUT = 0b0001;
     PJDIR = 0b1111;
+    jtag_init();
+    // Make sure our UEXT pins don't burn things, hopefully
+    P4DS = 0;
+    PJDS = 0;
+#elif ORDB3A
+    // P1 is NAND data
+    P1OUT = 0x00;	
+    P1DIR = 0x00;
+    P1REN = 0xff;
+    // P2 has wifi interrupt
+    P2OUT = 1;
+    P2DIR = 0;
+    P2REN = 1;
+    // P3 is absent
+    //P3OUT = 0x00;
+    //P3DIR = 0xFF;
+    // P4 has JTAG (0..3), UART (4,5) and I²C (6,7)
+    P4OUT = 0b11110110;
+    P4DIR = 0b00011011;
+    P4REN = 0b11100100;
+    // P5 has 6 pins, (xout) xin (xt2out) xt2in CLE CEn
+    P5OUT = 0xff;
+    P5DIR = 0x00;
+    P5REN = 0b101011;
+    // P6 has 4 pins, REn PWR_EN SCL SDA
+    P6OUT = 0b1111;
+    P6REN = 0b1111;
+    P6DIR = 0b0100;
+    // PJ has R/BYn WP ALE WEn
+    PJOUT = 0b0101;
+    PJDIR = 0b0000;
+    PJREN = 0b1111;
     jtag_init();
     // Make sure our UEXT pins don't burn things, hopefully
     P4DS = 0;
@@ -340,8 +385,6 @@ __interrupt void TIMER1_A0_ISR (void)
 	//PJOUT ^= BIT3;                                          //Toggle LED P1.0
 	bTimerTripped_event = TRUE;
 	// Wake main thread up
-	SR_sleep &= ~LPM3_bits;
-    	 __bic_SR_register_on_exit(LPM3_bits);   // Exit LPM0-3
+	WAKEUP_IRQ(LPM3_bits);
     	 __no_operation();                       // Required for debugger
-
 }

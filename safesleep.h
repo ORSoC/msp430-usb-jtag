@@ -46,3 +46,8 @@ static inline void enter_sleep(void) {
 static inline void set_sleep_mode(uint8_t sleepmode) {
 	SR_sleep_mode = sleepmode;
 }
+
+static inline void init_sleep(uint8_t sleepmode) {
+	set_sleep_mode(sleepmode);
+	SR_sleep = SR_sleep_mode;
+}
