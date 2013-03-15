@@ -116,7 +116,7 @@ unsigned int boardInitOrdb3a(void)
 	unsigned char chipRev;
 	unsigned int result;
 
-	PWR_EN_OFF;	// Critical; output level is undefined at startup in msp430!
+	//PWR_EN_OFF;	// Critical; output level is undefined at startup in msp430!
 	PWR_EN_INIT;
 
 	do {
@@ -168,7 +168,9 @@ unsigned int boardInitOrdb3a(void)
 
 	/* Enable lines: FIXME use sequencer? */
 	/* Sequencer will power up all other rails, just turn on uC and VBUS */
-	SET_TPS_REG_PW2(TPS65217_ENABLE, TPS65217_ENABLE_LDO1_EN | TPS65217_ENABLE_LS2_EN);
+	SET_TPS_REG_PW2(TPS65217_ENABLE, 
+			TPS65217_ENABLE_LDO1_EN | TPS65217_ENABLE_LS2_EN | // MCU
+			0x7f /* enable all */);
 	// USB should be possible from here
 
 	// TODO: Fix: It seems like the TP265217 hangs here, with both SCL and SDA low.
@@ -178,9 +180,10 @@ unsigned int boardInitOrdb3a(void)
 
 		PWR_EN_ON;	// At this point, PM chip will power up all the other rails
 		LED_ON;  // power management chip detected, so far so good
+		break;  // If we got this far, things are looking good
 
 	//TODO: init FPGA;
-	} while (0);
+	} while (1);
 
 	return result;
 }
