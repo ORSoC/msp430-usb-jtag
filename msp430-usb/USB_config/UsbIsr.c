@@ -48,7 +48,7 @@ extern BYTE USBHID_handleSetReportDataAvailable (BYTE intfnum);
 /*----------------------------------------------------------------------------+
 | External Variables                                                          |
 +----------------------------------------------------------------------------*/
-extern volatile WORD SR_sleep;
+#include "safesleep.h"
 extern BYTE  bFunctionSuspended;
 extern __no_init tEDB0 __data16 tEndPoint0DescriptorBlock;
 extern __no_init tEDB __data16 tInputEndPointDescriptorBlock[];
@@ -202,8 +202,7 @@ __interrupt VOID iUsbInterruptHandler(VOID)
     }
     if (bWakeUp)
     {
-	    SR_sleep &= ~LPM3_bits;
-    	 __bic_SR_register_on_exit(LPM3_bits);   // Exit LPM0-3
+	    WAKEUP_IRQ(LPM3_bits);
     	 __no_operation();                       // Required for debugger
     }
 }
