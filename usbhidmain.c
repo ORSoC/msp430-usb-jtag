@@ -65,6 +65,7 @@
 
 #include "usbConstructs.h"
 
+#include "defs.h"
 #include "jtag.h"
 #include "safesleep.h"
 
@@ -167,7 +168,7 @@ VOID main (VOID)
                 break;
 
             case ST_ENUM_SUSPENDED:
-                PJOUT &= ~BIT3;                                                     //When suspended, turn off LED
+                LED_OFF;                                                     //When suspended, turn off LED
 		set_sleep_mode(LPM0_bits);
 		enter_sleep();
                 break;
