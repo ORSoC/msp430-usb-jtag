@@ -245,12 +245,12 @@ extern __no_init tDEVICE_REQUEST __data16 tSetupPacket;
 
 /* FTDI latency timer setting */
 BYTE usbSetLatencyTimer(VOID) {
-	TA1CCR0 = tSetupPacket.wValue*(1024/4);
+	TA1CCR0 = tSetupPacket.wValue*(32768/1024/2);
         usbSendZeroLengthPacketOnIEP0();
 	return (FALSE);
 }
 BYTE usbGetLatencyTimer(VOID) {
-	BYTE ftdi_latency = TA1CCR0/(1024/4);
+	BYTE ftdi_latency = TA1CCR0/(32768/1024/2);
 	usbSendDataPacketOnEP0(&ftdi_latency);
 	return (FALSE);
 }

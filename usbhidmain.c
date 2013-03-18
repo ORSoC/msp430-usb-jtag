@@ -75,7 +75,7 @@ VOID Init_Ports (VOID);
 VOID Init_Clock (VOID);
 VOID Init_TimerA1 (VOID);
 static void inline Reset_TimerA1(void) {
-	TA1CTL = TASSEL_1 + ID_2 + TACLR + MC__UP;                              //ACLK/4, clear TAR
+	TA1CTL = TASSEL__ACLK + ID__2 + TACLR + MC__UP;                              //ACLK/1, clear TAR
 }
 BYTE retInString (char* string);
 
@@ -348,9 +348,9 @@ __interrupt VOID UNMI_ISR (VOID)
  */
 VOID Init_TimerA1 (VOID)
 {
-	// Count at ACLK/4 = 32768Hz/4=8192Hz so that we support the full latency range
-	// simply multiply latency timer by 1024/4=256 (i.e. just set the high byte)
-	TA1CCR0 = 16*1024/4;  // default timeout 16ms
+	// Count at ACLK/2 = 32768Hz/2 = 16384Hz
+	// Chosen such that we can use one RLAM to do *16 for latency timer
+	TA1CCR0 = 16*(32768/1024/2);  // default timeout 16ms
 	TA1CCTL0 = CCIE;                                        //CCR0 interrupt enabled
 	Reset_TimerA1();
 }
