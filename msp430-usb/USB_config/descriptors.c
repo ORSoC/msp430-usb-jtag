@@ -241,16 +241,32 @@ BYTE usbSetVendor(VOID) {
 	return (FALSE);
 }
 
+extern __no_init tDEVICE_REQUEST __data16 tSetupPacket;
+
+/* FTDI latency timer setting */
+BYTE usbSetLatencyTimer(VOID) {
+	TA1CCR0 = tSetupPacket.wValue*(1024/4);
+        usbSendZeroLengthPacketOnIEP0();
+	return (FALSE);
+}
+BYTE usbGetLatencyTimer(VOID) {
+	BYTE ftdi_latency = TA1CCR0/(1024/4);
+	usbSendDataPacketOnEP0(&ftdi_latency);
+	return (FALSE);
+}
+
+extern __no_init tEDB0 tEndPoint0DescriptorBlock;
 BYTE usbDisconnectThenBSL(VOID) {
 	volatile long i;
 	/* Just acknowledge the data without using it */
         usbSendZeroLengthPacketOnIEP0();
-	/* Shut down USB contact - TODO: de-enumerate? */
+//	while (!(tEndPoint0DescriptorBlock.bIEPBCNT & EPBCNT_NAK));  /* wait until sent */
+	/* Shut down USB contact - TODO: de-enumerate? wait for response to be sent? */
 	USB_disable();
 	/* Stop DMA units so they can't interfere with BSL */
 	DMA0CTL = DMA1CTL = DMA2CTL = 0;
 	/* Wait to make sure host sees we're gone */
-	for (i=0; i<USB_MCLK_FREQ/2; i++);
+	for (i=0; i<USB_MCLK_FREQ/40; i++);
 	/* Start BSL */
 	void (*BSL)(void) = (void*)0x1000;
 	BSL();
@@ -259,8 +275,15 @@ BYTE usbDisconnectThenBSL(VOID) {
 
 const tDEVICE_REQUEST_COMPARE tUsbRequestList[] = 
 {
+	/* FTDI latency timer set/get */
+	USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_DEVICE, 9,
+	0,0, 0,0, 0,0,
+	0xc0, &usbSetLatencyTimer,
+	USB_REQ_TYPE_INPUT | USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_DEVICE, 10,
+	0,0, 0,0, 0,0,
+	0xc0, &usbGetLatencyTimer,
 	/* Vendor specific requests - sent for FTDI chip */
-	USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_CLASS | USB_REQ_TYPE_DEVICE, 0,
+	USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_DEVICE, 0,
 	0,0, 0,0, 0,0,
 	0x80, &usbSetVendor,
 	// Huawei style mode switch - jump to bootloader

@@ -74,6 +74,9 @@ extern unsigned int boardInit(void);
 VOID Init_Ports (VOID);
 VOID Init_Clock (VOID);
 VOID Init_TimerA1 (VOID);
+static void inline Reset_TimerA1(void) {
+	TA1CTL = TASSEL_1 + ID_2 + TACLR + MC__UP;                              //ACLK/4, clear TAR
+}
 BYTE retInString (char* string);
 
 volatile BYTE bHIDDataReceived_event = FALSE;   //Indicates data has been received without an open rcv operation
@@ -149,6 +152,7 @@ VOID main (VOID)
 		    o = usbblaster_process_buffer(pieceOfString, len);
 
 		    if (o) {
+		    Reset_TimerA1();
 #if 0 /* InBackground expects the buffer to remain unchanged */
                     hidSendDataInBackground((BYTE*)pieceOfString,
                         o,HID0_INTFNUM,0);                      //Echoes back the characters received (needed
@@ -288,7 +292,7 @@ VOID Init_Ports (VOID)
     // P3 is absent
     //P3OUT = 0x00;
     //P3DIR = 0xFF;
-    // P4 has JTAG (0..3), UART (4,5) and I²C (6,7)
+    // P4 has GPS_RESET_N LNA_EN RXD TXD TCK TDO TDI TMS
     P4OUT = 0b11110110;
     P4DIR = 0b00011011;
     P4REN = 0b11100100;
@@ -305,9 +309,6 @@ VOID Init_Ports (VOID)
     PJDIR = 0b0000;
     PJREN = 0b1111;
     jtag_init();
-    // Make sure our UEXT pins don't burn things, hopefully
-    P4DS = 0;
-    PJDS = 0;
 #else
 #error Unknown board!
 #endif
@@ -347,9 +348,11 @@ __interrupt VOID UNMI_ISR (VOID)
  */
 VOID Init_TimerA1 (VOID)
 {
-	TA1CCR0 = 0x1000;  // TODO: decide on frequency
-    TA1CCTL0 = CCIE;                                        //CCR0 interrupt enabled
-    TA1CTL = TASSEL_1 + TACLR + MC__UP;                              //ACLK, clear TAR
+	// Count at ACLK/4 = 32768Hz/4=8192Hz so that we support the full latency range
+	// simply multiply latency timer by 1024/4=256 (i.e. just set the high byte)
+	TA1CCR0 = 16*1024/4;  // default timeout 16ms
+	TA1CCTL0 = CCIE;                                        //CCR0 interrupt enabled
+	Reset_TimerA1();
 }
 
 /*  
