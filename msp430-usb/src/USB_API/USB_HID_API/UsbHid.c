@@ -510,11 +510,15 @@ BYTE USBHID_receiveData (BYTE* data, WORD size, BYTE intfNum)
             &tOutputEndPointDescriptorBlock[edbIndex].bEPBCTX){
             HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT1 =
                 &tOutputEndPointDescriptorBlock[edbIndex].bEPBCTY;
+            HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT2 =
+                &tOutputEndPointDescriptorBlock[edbIndex].bEPBCTX;
             HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCurrentEpPos =
                 (BYTE*)stUsbHandle[intfNum].oep_Y_Buffer;
         } else {
             HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT1 =
                 &tOutputEndPointDescriptorBlock[edbIndex].bEPBCTX;
+            HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT2 =
+                &tOutputEndPointDescriptorBlock[edbIndex].bEPBCTY;
             HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCurrentEpPos =
                 (BYTE*)stUsbHandle[intfNum].oep_X_Buffer;
         }
@@ -611,6 +615,7 @@ BYTE USBHID_receiveData (BYTE* data, WORD size, BYTE intfNum)
             if ((HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesToReceiveLeft >
                  0) &&                                                      //do we have more data to receive?
                 (nTmp1 & EPBCNT_NAK)){                                      //if the second buffer has received data?
+		    BYTE *pTmp;
                 nTmp1 = nTmp1 & 0x7f;                                       //clear NAK bit
 #if 0   /* TI HID datapipe protocol */
                 HidReadCtrl[INTFNUM_OFFSET(intfNum)].nBytesInEp =
@@ -628,8 +633,10 @@ BYTE USBHID_receiveData (BYTE* data, WORD size, BYTE intfNum)
                     HidReadCtrl[INTFNUM_OFFSET(
                                     intfNum)
                     ].pCT2,intfNum);
+		pTmp = HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT1;
                 HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT1 =
                     HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT2;
+                HidReadCtrl[INTFNUM_OFFSET(intfNum)].pCT2 = pTmp;
             }
         }
     }
