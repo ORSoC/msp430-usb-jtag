@@ -168,6 +168,17 @@ void jtag_spi_off(void) {
  */
 void jtag_shift_bytes_start(const uint8_t *bytes_out, uint8_t *bytes_in, uint16_t len) {
 	jtag_spi_on();
+#define ERRATUM_DMA10 1
+#if ERRATUM_DMA10
+		// Avoiding DMA mode for the moment because of erratum DMA10
+		// Accessing USB module becomes unreliable because DMA unit can break transfers
+	while (len--) {
+		UCB1TXBUF=*bytes_out++;
+		while (!(UCB1IFG & UCRXIFG))
+			/* wait */;
+		*bytes_in++=UCB1RXBUF;
+	}
+#else
 	/* Set DMA up to feed SPI */
 	DMA0CTL = DMA1CTL = 0;  // disable both channels
 	DMACTL0 = DMA1TSEL__USCIB1TX | DMA0TSEL__USCIB1RX;  // Trigger source for both DMAs
@@ -184,13 +195,16 @@ void jtag_shift_bytes_start(const uint8_t *bytes_out, uint8_t *bytes_in, uint16_
 
 	/* DMA channels auto-disable when done, but P4SEL and UCB1CTL1 need to be reset */
 	/* Could enable an interrupt from DMA0 to report finish */
+#endif
 }
 
 void jtag_shift_bytes_finish() {
+#ifndef ERRATUM_DMA10
 	/* Await the transfer to finish then switch back to GPIO */
 	while ((DMA0CTL|DMA1CTL) & DMAEN) {
 		/* Wait for DMA to finish */;
 	}
+#endif
 	jtag_spi_off();
 }
 
