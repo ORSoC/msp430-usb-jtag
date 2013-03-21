@@ -1297,27 +1297,11 @@ BYTE usbDecodeAndProcessUsbRequest (VOID)
 
     while (1)
     {
-        bRequestType = *pbUsbRequestList++;
-        bRequest     = *pbUsbRequestList++;
+            //compare all 8 bytes
+            bResult = 0x00;
+            bMask   = 0x80;
 
-        if (((bRequestType == 0xff) && (bRequest == 0xff)) ||
-            (tSetupPacket.bmRequestType ==
-             (USB_REQ_TYPE_INPUT | USB_REQ_TYPE_VENDOR |
-              USB_REQ_TYPE_DEVICE)) ||
-            (tSetupPacket.bmRequestType ==
-             (USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_VENDOR |
-              USB_REQ_TYPE_DEVICE))){
-            pbUsbRequestList -= 2;
-            break;
-        }
-
-        if ((bRequestType == tSetupPacket.bmRequestType) &&
-            (bRequest == tSetupPacket.bRequest)){
-            //compare the first two
-            bResult = 0xc0;
-            bMask   = 0x20;
-            //first two bytes matched, compare the rest
-            for (bTemp = 2; bTemp < 8; bTemp++)
+            for (bTemp = 0; bTemp < 8; bTemp++)
             {
                 if (*((BYTE*)ptSetupPacket + bTemp) == *pbUsbRequestList){
                     bResult |= bMask;
@@ -1332,9 +1316,6 @@ BYTE usbDecodeAndProcessUsbRequest (VOID)
             } else {
                 pbUsbRequestList += (sizeof(tDEVICE_REQUEST_COMPARE) - 8);
             }
-        } else {
-            pbUsbRequestList += (sizeof(tDEVICE_REQUEST_COMPARE) - 2);
-        }
     }
 
     //if another setup packet comes before we have the chance to process current
