@@ -251,6 +251,8 @@ BYTE usbSetLatencyTimer(VOID) {
 }
 BYTE usbGetLatencyTimer(VOID) {
 	BYTE ftdi_latency = TA1CCR0/(32768/1024/2);
+	usbClearOEP0ByteCount();            //for status stage
+	wBytesRemainingOnIEP0 = 1;
 	usbSendDataPacketOnEP0(&ftdi_latency);
 	return (FALSE);
 }
@@ -269,7 +271,7 @@ BYTE usbDisconnectThenBSL(VOID) {
 	for (i=0; i<USB_MCLK_FREQ/40; i++);
 	/* Start BSL */
 	void (*BSL)(void) = (void*)0x1000;
-	BSL();
+	BSL();	// Does not return
 	return (FALSE);
 }
 
@@ -277,10 +279,10 @@ const tDEVICE_REQUEST_COMPARE tUsbRequestList[] =
 {
 	/* FTDI latency timer set/get */
 	USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_DEVICE, 9,
-	0,0, 0,0, 0,0,
+	0xff,0xff, 0xff,0xff, 0xff,0xff,
 	0xc0, &usbSetLatencyTimer,
 	USB_REQ_TYPE_INPUT | USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_DEVICE, 10,
-	0,0, 0,0, 0,0,
+	0xff,0xff, 0xff,0xff, 0xff,0xff,
 	0xc0, &usbGetLatencyTimer,
 	/* Vendor specific requests - sent for FTDI chip */
 	USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_VENDOR | USB_REQ_TYPE_DEVICE, 0,
