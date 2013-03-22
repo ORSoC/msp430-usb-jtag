@@ -164,7 +164,7 @@ VOID main (VOID)
 		    } while (len);
                 }
 #if 1
-		else if (bTimerTripped_event) {  // Be sure to send status bytes now and then (16ms)
+		if (bTimerTripped_event) {  // Be sure to send status bytes now and then (16ms)
 			bTimerTripped_event = FALSE;
 			hidSendDataWaitTilDone(0,0,HID0_INTFNUM,0);
 		}
