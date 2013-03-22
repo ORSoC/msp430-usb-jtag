@@ -1,5 +1,11 @@
 /* Routines to access NAND Flash memory on ORDB3 from MSP430 */
 
+/* I don't care that this is a msp430x, I know I have <64KiB */
+typedef unsigned short phys_addr_t;
+typedef unsigned char u8;
+typedef unsigned short u16;
+
+#include <asm/errno.h>
 #include <linux/mtd/nand.h>
 #include <msp430.h>
 
@@ -39,125 +45,123 @@
 # error //Need to correct pin mappings
 #endif
 
-#define P(n,func) P##n##_##func
-#define SET_PORT(port, bits) P(port,OUT) |= (bits)
-#define CLR_PORT(port, bits) P(port,OUT) &= ~(bits)
-#define RD_PORT(port, bits) P(port,IN) & (bits)
-
 static inline void nand_init(void) {
-	SET_PORT(CEn_PORT,CEn_BIT);
-	P(CEn_PORT,DIR) |= CEn_BIT;
+	P5OUT |= CEn_BIT;
+	P5DIR |= CEn_BIT;
 
-	P(DATA_PORT,DIR) = 0;
-	P(DATA_PORT,REN) = 0;
-	SET_PORT(REn_PORT, REn_BIT);
-	P(REn_PORT,DIR) |= REn_BIT;
-	SET_PORT(WPn_PORT, WEn_BIT|R_Bn_BIT);
-	CLR_PORT(WPn_PORT, WPn_BIT|ALE_BIT);
-	P(WPn_PORT,REN) |= R_Bn_BIT;
-	P(WPn_PORT,DIR) |= WEn_BIT|WPn_BIT|ALE_BIT;
-	CLR_PORT(CLE_PORT,CLE_BIT|CEn_BIT);
-	P(CLE_PORT,DIR) |= CLE_BIT|CEn_BIT;
+	P1DIR = 0;
+	P1REN = 0;
+	P6OUT |= REn_BIT;
+	P6DIR |= REn_BIT;
+	PJOUT |= WEn_BIT|R_Bn_BIT;
+	PJOUT &= ~(WPn_BIT|ALE_BIT);
+	PJREN |= R_Bn_BIT;
+	PJDIR |= WEn_BIT|WPn_BIT|ALE_BIT;
+	P5OUT &= ~(CLE_BIT|CEn_BIT);
+	P5DIR |= CLE_BIT|CEn_BIT;
 }
 static inline void nand_close(void) {
 	// Release, but keep pullup for R/Bn and CEn and pulldown for WPn
-	P(DATA_PORT,DIR) = 0;
-	CLR_PORT(CEn_PORT,CEn_BIT);
-	P(CEn_PORT,REN) |= CEn_BIT;
-	P(CLE_PORT,DIR) &= ~(CLE_BIT|CEn_BIT);
-	P(REn_PORT,DIR) &= ~REn_BIT;
-	CLR_PORT(WPn_PORT,WPn_BIT);
-	P(WPn_PORT,REN) |= WPn_BIT;
-	P(WPn_PORT,DIR) &= ~(WEn_BIT|WPn_BIT|ALE_BIT);
+	P1DIR = 0;
+	P5OUT |= CEn_BIT;
+	P5REN |= CEn_BIT;
+	P5DIR &= ~(CLE_BIT|CEn_BIT);
+	P6DIR &= ~REn_BIT;
+	PJOUT &= ~WPn_BIT;
+	PJREN |= WPn_BIT;
+	PJDIR &= ~(WEn_BIT|WPn_BIT|ALE_BIT);
 }
 
 static inline void nand_enable_write(void) {
-	SET_PORT(WPn_PORT,WPn_BIT);
+	PJOUT |= WPn_BIT;
 }
 static inline void nand_disable_write(void) {
-	CLR_PORT(WPn_PORT,WPn_BIT);
+	PJOUT &= ~WPn_BIT;
 }
 
-static inline nand_write_byte(uint8_t data) {
-	P(DATA_PORT,PORT) = data;
-	P(DATA_PORT,DIR) = 0xff;
-	CLR_PORT(WEn_PORT,WEn_BIT);
-	SET_PORT(WEn_PORT,WEn_BIT);
+static inline void nand_write_byte(uint8_t data) {
+	P1OUT = data;
+	P1DIR = 0xff;
+	PJOUT &= ~WEn_BIT;
+	PJOUT |= WEn_BIT;
 }
 
 /* Functions ready for use from Linux/U-Boot MTD style code */
 
-static void nand_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len) {
-	P(DATA_PORT,DIR) = 0xff;
+static void ordb3_nand_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len) {
+	P1DIR = 0xff;
 	while (len--) {
-		P(DATA_PORT,PORT) = *buf++;
-		CLR_PORT(WEn_PORT,WEn_BIT);
-		SET_PORT(WEn_PORT,WEn_BIT);
+		P1OUT = *buf++;
+		PJOUT &= ~WEn_BIT;
+		PJOUT |= WEn_BIT;
 	}
 }
 
-static void nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len) {
-	P(DATA_PORT,DIR) = 0x00;
+static void ordb3_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len) {
+	P1DIR = 0x00;
 	while (len--) {
-		CLR_PORT(REn_PORT,WEn_BIT);
-		*buf++ = P(DATA_PORT,PIN);
-		SET_PORT(REn_PORT,WEn_BIT);
+		P6OUT &= ~REn_BIT;
+		*buf++ = P1IN;
+		P6OUT |= REn_BIT;
 	}
 }
 
-static void nand_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int len) {
-	P(DATA_PORT,DIR) = 0x00;
+static int nand_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int len) {
+	P1DIR = 0x00;
 	while (len--) {
-		CLR_PORT(REn_PORT,WEn_BIT);
-		if (*buf++ != P(DATA_PORT,PIN))
+		uint8_t val;
+		P6OUT &= ~REn_BIT;
+		val=P1IN;
+		P6OUT |= REn_BIT;
+		if (*buf++ != val)
 			return -EFAULT;
-		SET_PORT(REn_PORT,WEn_BIT);
 	}
 	return 0;
 }
 
-static uint8_t nand_read_byte(struct mtd_info *mtd) {
+static uint8_t ordb3_nand_read_byte(struct mtd_info *mtd) {
 	char val;
-	P(DATA_PORT,DIR) = 0x00;
-	CLR_PORT(REn_PORT,REn_BIT);
-	val = P(DATA_PORT,IN);
-	SET_PORT(REn_PORT,REn_BIT);
+	P1DIR = 0x00;
+	P6OUT &= ~REn_BIT;
+	val=P1IN;
+	P6OUT |= REn_BIT;
 	return val;
 }
 
 static int nand_ready(struct mtd_info *mtd) {
-	return RD_PORT(R_Bn_PORT, R_Bn_BIT);
+	return PJIN & R_Bn_BIT;
 }
 
 static void cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl) {
 	if (cmd==NAND_CMD_NONE)
 		return;
 	if (ctrl & NAND_CLE) {
-		SET_PORT(CLE_PORT,CLE_PIN);
+		P5OUT |= CLE_BIT;
 		nand_write_byte(cmd);
-		CLR_PORT(CLE_PORT,CLE_PIN);
+		P5OUT &= ~CLE_BIT;
 	} else {
-		SET_PORT(ALE_PORT,ALE_PIN);
+		PJOUT |= ALE_BIT;
 		nand_write_byte(cmd);
-		CLR_PORT(ALE_PORT,ALE_PIN);
+		PJOUT &= ~ALE_BIT;
 	}
 }
 
 /* Default function uses a command instead */
 static void select_chip(struct mtd_info *mtd, int chip) {
 	if (chip==0) {
-		CLR_PORT(CEn_PORT, CEn_BIT);
+		P5OUT &= ~CEn_BIT;
 	} else {
-		SET_PORT(CEn_PORT, CEn_BIT);
+		P5OUT |= CEn_BIT;
 	}
 }
 
 int board_nand_init(struct nand_chip *nand) {
-	nand.read_byte=nand_read_byte;
-	nand.write_buf=nand_write_buf;
-	nand.read_buf=nand_read_buf;
-	nand.verify_buf=nand_verify_buf;
-	nand.select_chip=select_chip;
-	nand.cmd_ctrl=cmd_ctrl;
+	nand->read_byte=ordb3_nand_read_byte;
+	nand->write_buf=ordb3_nand_write_buf;
+	nand->read_buf=ordb3_nand_read_buf;
+	nand->verify_buf=nand_verify_buf;
+	nand->select_chip=select_chip;
+	nand->cmd_ctrl=cmd_ctrl;
+	nand->dev_ready=nand_ready;
 	return 0;
 }
