@@ -305,8 +305,8 @@ VOID Init_Ports (VOID)
     P6REN = 0b1111;
     P6DIR = 0b0100;
     // PJ has R/BYn WP ALE WEn
-    PJOUT = 0b0101;
-    PJDIR = 0b0000;
+    PJOUT = 0b1001;
+    PJDIR = 0b0100;
     PJREN = 0b1111;
     jtag_init();
 #else
