@@ -1,5 +1,8 @@
 /* Routines to access NAND Flash memory on ORDB3 from MSP430 */
 
+#include <USB_API/USB_Common/types.h>
+#include <USB_API/USB_HID_API/UsbHid.h>
+
 /* I don't care that this is a msp430x, I know I have <64KiB */
 #if NAND_MTD
 typedef unsigned short phys_addr_t;
@@ -86,7 +89,7 @@ static inline void nand_disable_write(void) {
 	PJOUT &= ~WPn_BIT;
 }
 
-static inline void nand_write_byte(uint8_t data) {
+static inline void nand_write_byte(char data) {
 	P1OUT = data;
 	P1DIR = 0xff;
 	PJOUT &= ~WEn_BIT;
@@ -109,7 +112,7 @@ static inline void nand_CLE(int cle) {
 
 /* Functions ready for use from Linux/U-Boot MTD style code */
 
-static void ordb3_nand_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len) {
+static void ordb3_nand_write_buf(struct mtd_info *mtd, const char *buf, int len) {
 	P1DIR = 0xff;
 	while (len--) {
 		P1OUT = *buf++;
@@ -118,7 +121,7 @@ static void ordb3_nand_write_buf(struct mtd_info *mtd, const uint8_t *buf, int l
 	}
 }
 
-static void ordb3_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len) {
+static void ordb3_nand_read_buf(struct mtd_info *mtd, char *buf, int len) {
 	P1DIR = 0x00;
 	while (len--) {
 		P6OUT &= ~REn_BIT;
@@ -130,7 +133,7 @@ static void ordb3_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len) {
 #ifndef EFAULT
 #define EFAULT 14
 #endif
-static int nand_verify_buf(struct mtd_info *mtd, const uint8_t *buf, int len) {
+static int nand_verify_buf(struct mtd_info *mtd, const char *buf, int len) {
 	P1DIR = 0x00;
 	while (len--) {
 		uint8_t val;
@@ -210,6 +213,23 @@ int nand_probe(char *buf, int size) {
 
 	select_chip(0, 0);
 	
+	/* Wait for initial ready */
+	for (timeout=-1; timeout && !nand_ready(0); --timeout)
+		;  // Wait until flash chip ready
+	if (!nand_ready(0))
+		return 0;
+
+	/* Perform reset */
+	nand_CLE(1);
+	nand_write_byte(0xff);
+	nand_CLE(0);
+
+	/* Wait for reset to finish */
+	for (timeout=-1; timeout && !nand_ready(0); --timeout)
+		;  // Wait until flash chip ready
+	if (!nand_ready(0))
+		return 0;
+
 	/* Read ID */
 	nand_CLE(1);
 	nand_write_byte(0x90);
@@ -220,9 +240,9 @@ int nand_probe(char *buf, int size) {
 	ordb3_nand_read_buf(0, buf, 4);
 	
 	if (!(buf[0]=='O' &&
-	      buf[0]=='N' &&
-	      buf[0]=='F' &&
-	      buf[0]=='I')) {
+	      buf[1]=='N' &&
+	      buf[2]=='F' &&
+	      buf[3]=='I')) {
 		buf[0]='F';
 		buf[1]='a';
 		buf[2]='i';
@@ -283,4 +303,13 @@ int nand_probe(char *buf, int size) {
 	// Read ID strings
 	ordb3_nand_read_buf(0, buf+4+1, 32);
 	return 4+1+32;
+}
+
+static int nandreport_size;
+static char nandreport[61];
+void Do_NAND_Probe(void) {
+	nandreport_size = nand_probe(nandreport, sizeof nandreport);
+}
+void Report_NAND(int ifnum) {
+	USBHID_sendData(nandreport,nandreport_size,ifnum);
 }
