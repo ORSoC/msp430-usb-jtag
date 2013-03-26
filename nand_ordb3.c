@@ -3,20 +3,7 @@
 #include <USB_API/USB_Common/types.h>
 #include <USB_API/USB_HID_API/UsbHid.h>
 
-/* I don't care that this is a msp430x, I know I have <64KiB */
-#if NAND_MTD
-typedef unsigned short phys_addr_t;
-typedef unsigned char u8;
-typedef unsigned short u16;
-
-#include <asm/errno.h>
-#include <linux/mtd/nand.h>
-
-#else
-
 #include <stdint.h>
-struct mtd_info; /* not used */
-#endif
 #include <msp430.h>
 
 // Port J is mapped as port 19 if you extrapolate from 1/2, 3/4 etc
@@ -54,6 +41,9 @@ struct mtd_info; /* not used */
 #else
 # error //Need to correct pin mappings
 #endif
+
+#define ROWBYTES 3
+typedef long row_t;
 
 static inline void nand_init(void) {
 	P5OUT |= CEn_BIT;
@@ -110,9 +100,7 @@ static inline void nand_CLE(int cle) {
 		P5OUT &= ~CLE_BIT;
 }
 
-/* Functions ready for use from Linux/U-Boot MTD style code */
-
-static void ordb3_nand_write_buf(struct mtd_info *mtd, const char *buf, int len) {
+static void ordb3_nand_write_buf(const char *buf, int len) {
 	P1DIR = 0xff;
 	while (len--) {
 		P1OUT = *buf++;
@@ -121,7 +109,7 @@ static void ordb3_nand_write_buf(struct mtd_info *mtd, const char *buf, int len)
 	}
 }
 
-static void ordb3_nand_read_buf(struct mtd_info *mtd, char *buf, int len) {
+static void ordb3_nand_read_buf(char *buf, int len) {
 	P1DIR = 0x00;
 	while (len--) {
 		P6OUT &= ~REn_BIT;
@@ -133,7 +121,7 @@ static void ordb3_nand_read_buf(struct mtd_info *mtd, char *buf, int len) {
 #ifndef EFAULT
 #define EFAULT 14
 #endif
-static int nand_verify_buf(struct mtd_info *mtd, const char *buf, int len) {
+static int nand_verify_buf(const char *buf, int len) {
 	P1DIR = 0x00;
 	while (len--) {
 		uint8_t val;
@@ -146,7 +134,7 @@ static int nand_verify_buf(struct mtd_info *mtd, const char *buf, int len) {
 	return 0;
 }
 
-static uint8_t ordb3_nand_read_byte(struct mtd_info *mtd) {
+static uint8_t ordb3_nand_read_byte(void) {
 	char val;
 	P1DIR = 0x00;
 	P6OUT &= ~REn_BIT;
@@ -155,28 +143,12 @@ static uint8_t ordb3_nand_read_byte(struct mtd_info *mtd) {
 	return val;
 }
 
-static int nand_ready(struct mtd_info *mtd) {
+static int nand_ready(void) {
 	return PJIN & R_Bn_BIT;
 }
 
-#if NAND_MTD
-static void cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl) {
-	if (cmd==NAND_CMD_NONE)
-		return;
-	if (ctrl & NAND_CLE) {
-		nand_CLE(1);
-		nand_write_byte(cmd);
-		nand_CLE(0);
-	} else {
-		nand_ALE(1);
-		nand_write_byte(cmd);
-		nand_ALE(0);
-	}
-}
-#endif
-
 /* Default function uses a command instead */
-static void select_chip(struct mtd_info *mtd, int chip) {
+static void select_chip(int chip) {
 	if (chip==0) {
 		P5OUT &= ~CEn_BIT;
 	} else {
@@ -184,39 +156,54 @@ static void select_chip(struct mtd_info *mtd, int chip) {
 	}
 }
 
-#if NAND_MTD
-int board_nand_init(struct nand_chip *nand) {
-	nand->read_byte=ordb3_nand_read_byte;
-	nand->write_buf=ordb3_nand_write_buf;
-	nand->read_buf=ordb3_nand_read_buf;
-	nand->verify_buf=nand_verify_buf;
-	nand->select_chip=select_chip;
-	nand->cmd_ctrl=cmd_ctrl;
-	nand->dev_ready=nand_ready;
-	return 0;
+char nand_read_status(void) {
+	nand_CLE(1);
+	nand_write_byte(0x70);
+	nand_CLE(0);
+	return ordb3_nand_read_byte();
 }
-#endif
+
+int nand_erase_row(row_t row) {
+	long timeout;
+	int i;
+
+	for (timeout=-1; timeout && !nand_ready(); --timeout)
+		;  // Wait until flash chip ready
+	if (!nand_ready())
+		return 0;
+	nand_CLE(1);
+	nand_write_byte(0x60);
+	nand_CLE(0);
+	nand_ALE(1);
+	for (i=0; i<ROWBYTES; i++) {
+		nand_write_byte(row&0xff);
+		row>>=8;
+	}
+	nand_ALE(0);
+	nand_CLE(1);
+	nand_write_byte(0xd0);
+	nand_CLE(0);
+	for (timeout=-1; timeout && !nand_ready(); --timeout)
+		;  // Wait until flash chip ready
+	if (!nand_ready())
+		return 0;  // Timeout
+	return !(nand_read_status()&1);  // Fail not set
+}
 
 int nand_probe(char *buf, int size) {
 	int tries=1+5, i, timeout;
 
-#if NAND_MTD
-	struct mtd_info mtd;
-	struct nand_chip nand;
-	mtd.priv = &nand;
-	board_nand_init(&nand);
-#endif
 	if (size<4+1+32)
 		return 0;  /* Caller error */
 
 	nand_init();
 
-	select_chip(0, 0);
+	select_chip(0);
 	
 	/* Wait for initial ready */
-	for (timeout=-1; timeout && !nand_ready(0); --timeout)
+	for (timeout=-1; timeout && !nand_ready(); --timeout)
 		;  // Wait until flash chip ready
-	if (!nand_ready(0))
+	if (!nand_ready())
 		return 0;
 
 	/* Perform reset */
@@ -225,9 +212,9 @@ int nand_probe(char *buf, int size) {
 	nand_CLE(0);
 
 	/* Wait for reset to finish */
-	for (timeout=-1; timeout && !nand_ready(0); --timeout)
+	for (timeout=-1; timeout && !nand_ready(); --timeout)
 		;  // Wait until flash chip ready
-	if (!nand_ready(0))
+	if (!nand_ready())
 		return 0;
 
 	/* Read ID */
@@ -237,7 +224,7 @@ int nand_probe(char *buf, int size) {
 	nand_ALE(1);
 	nand_write_byte(0x20);
 	nand_ALE(0);
-	ordb3_nand_read_buf(0, buf, 4);
+	ordb3_nand_read_buf(buf, 4);
 	
 	if (!(buf[0]=='O' &&
 	      buf[1]=='N' &&
@@ -258,11 +245,12 @@ int nand_probe(char *buf, int size) {
 		nand_ALE(1);
 		nand_write_byte(0x00);  // manufacturer ID region
 		nand_ALE(0);
-		ordb3_nand_read_buf(0, buf+4, 5);
+		ordb3_nand_read_buf(buf+4, 5);
 
-		if (!(buf[4]==0x2c && buf[5]==0xf1)) {
+		if (!(buf[4]==0x2c && buf[5]==0xda)) {
+			// MT29F1G08ABADA is f1, MT29F2G08ABAEAH4 is da
 			buf[4]='!';
-			break;  // Not the MT29F1G08ABADA chip! Don't poke ECC..
+			break;  // Not the known chip, don't poke at vendor specific feature 
 		}
 
 		if (buf[4+4]&0x80)
@@ -279,9 +267,9 @@ int nand_probe(char *buf, int size) {
 		nand_write_byte(0x00);
 		nand_write_byte(0x00);
 		nand_write_byte(0x00);
-		for (timeout=-1; timeout && !nand_ready(0); --timeout)
+		for (timeout=-1; timeout && !nand_ready(); --timeout)
 			;  // Wait until flash chip ready
-		if (!nand_ready(0))
+		if (!nand_ready())
 			return 5;
 	} while (--tries);
 
@@ -292,16 +280,16 @@ int nand_probe(char *buf, int size) {
 	nand_ALE(1);
 	nand_write_byte(0x00);
 	nand_ALE(0);
-	for (timeout=-1; timeout && !nand_ready(0); --timeout)
+	for (timeout=-1; timeout && !nand_ready(); --timeout)
 		;  // Wait until flash chip ready
-	if (!nand_ready(0))
+	if (!nand_ready())
 		return 5;
 	// Skip bytes until human readable manufacturer and model
 	for (i=0; i<32; i++) {
-		ordb3_nand_read_byte(0);
+		ordb3_nand_read_byte();
 	}
 	// Read ID strings
-	ordb3_nand_read_buf(0, buf+4+1, 32);
+	ordb3_nand_read_buf(buf+4+1, 32);
 	return 4+1+32;
 }
 
