@@ -649,7 +649,6 @@ BYTE USB_forceRemoteWakeup ()
         return (kUSB_NotSuspended);
     }
     if (bRemoteWakeup == ENABLE){
-        volatile unsigned int i;
         USBCTL |= RWUP;                                                             //USB - Device Remote Wakeup Request - this bit
                                                                                     //is self-cleaned
         return (kUSB_succeed);
@@ -1289,7 +1288,6 @@ BYTE usbDecodeAndProcessUsbRequest (VOID)
     const BYTE* pbUsbRequestList;
     BYTE bWakeUp = FALSE;
     ptDEVICE_REQUEST ptSetupPacket = &tSetupPacket;
-    BYTE bRequestType,bRequest;
     tpF lAddrOfFunction;
 
     //point to beginning of the matrix
