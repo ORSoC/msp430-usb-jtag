@@ -31,19 +31,9 @@
  * --/COPYRIGHT--*/
 /*  
  * ======== main.c ========
- * H1 Example
- * LED Control Demo:
- *
- * This USB demo example is to be used with a PC application (e.g. HID App.exe)
- * This demo application is used to control the operation of the LED at P1.0
- *
- * Typing the following pharses in the HyperTerminal Window does the following
- * 1. "LED ON!" Turns on the LED and returns "LED is ON" phrase to PC
- * 2. "LED OFF!" Turns off the LED and returns "LED is OFF" back to HyperTerminal
- * 3. "LED TOGGLE - SLOW!" Turns on the timer used to toggle LED with a large
- *   period and returns "LED is toggling slowly" phrase back to HyperTerminal
- * 4. "LED TOGGLE - FAST!" Turns on the timer used to toggle LED with a smaller
- *   period and returns "LED is toggling fast" phrase back to HyperTerminal
+ * Originally based on demo H1 from TI MSP430 USB API package
+ * Heavily modified by ORSoC, to emulate FTDI chip, Altera USB Blaster and
+ * support bootloader function (that's in descriptors.c)
  *
  +----------------------------------------------------------------------------+
  * Please refer to the MSP430 USB API Stack Programmer's Guide,located
@@ -68,6 +58,7 @@
 #include "defs.h"
 #include "jtag.h"
 #include "safesleep.h"
+#include "nand_ordb3.h"
 
 extern unsigned int boardInit(void);
 
@@ -90,13 +81,16 @@ unsigned int FastToggle_Period = 1000 - 1;
 /*  
  * ======== main ========
  */
-VOID main (VOID)
+extern void Do_NAND_Probe(void);
+int main (VOID)
 {
     WDTCTL = WDTPW + WDTHOLD;                                   //Stop watchdog timer
 
     Init_Ports();                                               //Init ports (do first ports because clocks do change ports)
-    SetVCore(3);
+    SetVCore(3);	// Do this before accessing NAND but after talking to PM chip on I²C
     Init_Clock();                                               //Init clocks
+
+    Do_NAND_Probe();
 
     USB_init();                                 //init USB
     Init_TimerA1();
@@ -122,9 +116,8 @@ VOID main (VOID)
         {
             case ST_USB_DISCONNECTED:
 		    /* FIXME SR_sleep_next decision */
-		    set_sleep_mode(/*LPM3_bits*/LPM0_bits);
+		    set_sleep_mode(LPM3_bits);
 		    enter_sleep();
-                _NOP();
                 break;
 
             case ST_USB_CONNECTED_NO_ENUM:
@@ -162,11 +155,38 @@ VOID main (VOID)
 #endif
 		    }
 		    } while (len);
+
                 }
+		/* Flash interface handling */
+		if (nand_ready()) {
+			int len;
+			char buf[MAX_STR_LENGTH];
+			if (expect_nandreq()) {
+				len=USBHID_bytesInUSBBuffer(FLASH_INTFNUM);
+				if (len>=sizeof(struct nandreq)) {
+					hidReceiveDataInBuffer((BYTE*)&nand_state, sizeof(struct nandreq),
+							       FLASH_INTFNUM);
+					process_nandreq();
+				}
+			} else if ((len=expect_nanddata())) {  // Yes, this is an assignment
+				len=hidReceiveDataInBuffer((BYTE*)buf,
+							   sizeof(buf)<len?sizeof(buf):len,
+							   FLASH_INTFNUM);
+				process_nanddata(buf, len);
+			} else if (nand_state.readlen) {
+				len=produce_nanddata(buf, sizeof(buf)<62?sizeof(buf):62);
+				hidSendDataWaitTilDone((BYTE*)buf,len,FLASH_INTFNUM,0);
+			}
+		} else if (nand_state.readlen) {
+			SR_sleep=0;  /* Waiting for NAND, don't sleep */
+		}
 #if 1
 		if (bTimerTripped_event) {  // Be sure to send status bytes now and then (16ms)
 			bTimerTripped_event = FALSE;
-			hidSendDataWaitTilDone(0,0,HID0_INTFNUM,0);
+			/* We don't care if this send fails, because that can only mean it wasn't needed
+			   (data already on its way, or USB disconnected) */
+			USBHID_sendData(0,0,HID0_INTFNUM);
+			USBHID_sendData(0,0,FLASH_INTFNUM);
 		}
 #endif
                 break;
@@ -192,6 +212,7 @@ VOID main (VOID)
             default:;
         }
     }  //while(1)
+    return 0;
 } //main()
 
 /*  
@@ -355,30 +376,6 @@ VOID Init_TimerA1 (VOID)
 	Reset_TimerA1();
 }
 
-/*  
- * ======== retInString ========
- */
-//This function returns true if there's an 0x0D character in the string; and if so,
-//it trims the 0x0D and anything that had followed it.
-BYTE retInString (char* string)
-{
-    BYTE retPos = 0,i,len;
-    char tempStr[MAX_STR_LENGTH] = "";
-
-    strncpy(tempStr,string,strlen(string));                 //Make a copy of the string
-    len = strlen(tempStr);
-    while ((tempStr[retPos] != 0x21) && (retPos++ < len)) ; //Find 0x21 "!"; if not found, retPos ends up at len
-
-    if (retPos < len){                                      //If 0x21 was actually found...
-        for (i = 0; i < MAX_STR_LENGTH; i++){               //Empty the buffer
-            string[i] = 0x00;
-        }
-        strncpy(string,tempStr,retPos);                     //...trim the input string to just before 0x0D
-        return ( TRUE) ;                                    //...and tell the calling function that we did so
-    }
-
-    return ( FALSE) ;                                       //Otherwise, it wasn't found
-}
 
 /*  
  * ======== TIMER1_A0_ISR ========

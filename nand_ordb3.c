@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <msp430.h>
 
+#include <nand_ordb3.h>
+
 // Port J is mapped as port 19 if you extrapolate from 1/2, 3/4 etc
 #define J 19
 #define P19DIR PJDIR
@@ -44,6 +46,8 @@
 
 #define ROWBYTES 3
 typedef long row_t;
+struct nandreq nand_state;
+
 
 static inline void nand_init(void) {
 	P5OUT |= CEn_BIT;
@@ -59,6 +63,10 @@ static inline void nand_init(void) {
 	PJDIR |= WEn_BIT|WPn_BIT|ALE_BIT;
 	P5OUT &= ~(CLE_BIT|CEn_BIT);
 	P5DIR |= CLE_BIT|CEn_BIT;
+
+	nand_state.addr_bytes=0;
+	nand_state.writelen=0;
+	nand_state.readlen=0;
 }
 static inline void nand_close(void) {
 	// Release, but keep pullup for R/Bn and CEn and pulldown for WPn
@@ -143,7 +151,7 @@ static uint8_t ordb3_nand_read_byte(void) {
 	return val;
 }
 
-static int nand_ready(void) {
+int nand_ready(void) {
 	return PJIN & R_Bn_BIT;
 }
 
@@ -163,6 +171,7 @@ char nand_read_status(void) {
 	return ordb3_nand_read_byte();
 }
 
+#if 0 /* Better to leave this to host? Firmware is not planned to write on its own. */
 int nand_erase_row(row_t row) {
 	long timeout;
 	int i;
@@ -189,6 +198,7 @@ int nand_erase_row(row_t row) {
 		return 0;  // Timeout
 	return !(nand_read_status()&1);  // Fail not set
 }
+#endif
 
 int nand_probe(char *buf, int size) {
 	int tries=1+5, i, timeout;
@@ -301,3 +311,46 @@ void Do_NAND_Probe(void) {
 void Report_NAND(int ifnum) {
 	USBHID_sendData(nandreport,nandreport_size,ifnum);
 }
+
+
+#if 0
+/* XSVF player connection */
+#include <libxsvf.h>
+
+struct nand_state {
+	enum { disconnect, idle, reading, erasing, writing } state;
+	unsigned blocks[32];	// List of blocks holding XSVF data
+	int byteinpage, pageinblock, blockinlist;
+} nand_state;
+
+// TODO: Find out if libxsvf might be improved to support async reading.
+
+#endif
+
+void process_nandreq(void) {
+	nand_CLE(1);
+	nand_write_byte(nand_state.cmd);
+	nand_CLE(0);
+}
+void process_nanddata(char *data, int len) {
+	if (len && nand_state.addr_bytes) {
+		nand_ALE(1);
+		while (len-- && nand_state.addr_bytes--)
+			nand_write_byte(*data++);
+		nand_ALE(0);
+	}
+	if (len && nand_state.writelen) {
+		while (len-- && nand_state.writelen--)
+			nand_write_byte(*data++);
+	}
+}
+int produce_nanddata(char *data, int len) {
+	if (len>nand_state.readlen)
+		len=nand_state.readlen;
+	if (len) {
+		ordb3_nand_read_buf(data, len);
+		nand_state.readlen-=len;
+	}
+	return len;
+}
+

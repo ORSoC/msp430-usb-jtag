@@ -40,11 +40,11 @@ USBOBJS=\
 	usbConstructs.o usbEventHandling.o
 USBFWOBJS=usbhidmain.o jtag.o msp430-usb/USB_config/descriptors.o \
 	boardinit.o tps65217.o swi2cmst.o \
-	msp430-usb/USB_config/UsbIsr.o
+	msp430-usb/USB_config/UsbIsr.o nand_ordb3.o
 LDFLAGS += -Wl,--defsym=tSetupPacket=0x2380 -Wl,--defsym=tEndPoint0DescriptorBlock=0x0920 -Wl,--defsym=tInputEndPointDescriptorBlock=0x23C8 -Wl,--defsym=tOutputEndPointDescriptorBlock=0x2388 -Wl,--defsym=abIEP0Buffer=0x2378 -Wl,--defsym=abOEP0Buffer=0x2370
 
 libusb.a: $(USBOBJS)
 	ar rsc $@ $^
 
-usbhidmain: $(USBFWOBJS) libusb.a 
+usbhidmain: $(USBFWOBJS) libusb.a
 
