@@ -102,8 +102,8 @@ extern "C"
 
 #define PUTWORD(x)      ((x)&0xFF),((x)>>8)
 
-#define USB_OUTEP_INT_EN BIT0 | BIT2 
-#define USB_INEP_INT_EN BIT0 | BIT1 
+#define USB_OUTEP_INT_EN BIT0 | BIT2 | BIT4
+#define USB_INEP_INT_EN BIT0 | BIT1 | BIT3
 // MCLK frequency of MCU, in Hz
 // For running higher frequencies the Vcore voltage adjustment may required.
 // Please refer to Data Sheet of the MSP430 device you use
