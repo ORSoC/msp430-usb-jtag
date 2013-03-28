@@ -90,7 +90,7 @@ int main (VOID)
     SetVCore(3);	// Do this before accessing NAND but after talking to PM chip on I²C
     Init_Clock();                                               //Init clocks
 
-    Do_NAND_Probe();
+    Do_NAND_Probe();	// Initializes NAND and enables ECC
 
     USB_init();                                 //init USB
     Init_TimerA1();
@@ -115,7 +115,6 @@ int main (VOID)
         switch (USB_connectionState())
         {
             case ST_USB_DISCONNECTED:
-		    /* FIXME SR_sleep_next decision */
 		    set_sleep_mode(LPM3_bits);
 		    enter_sleep();
                 break;
@@ -126,7 +125,6 @@ int main (VOID)
             case ST_ENUM_ACTIVE:
 		    set_sleep_mode(LPM0_bits);
 		    enter_sleep();
-                _NOP();                                                             //For Debugger
 
                                                                                     //Exit LPM on USB receive and perform a receive
                                                                                     //operation
@@ -138,26 +136,21 @@ int main (VOID)
 
 		    do {
 
-                    len=hidReceiveDataInBuffer((BYTE*)pieceOfString,
-                        MAX_STR_LENGTH,
-                        HID0_INTFNUM);                                              //Get the next piece of the string
+			    len=hidReceiveDataInBuffer((BYTE*)pieceOfString,
+						       MAX_STR_LENGTH,
+						       HID0_INTFNUM);               //Get the next piece of the string
 
-		    o = usbblaster_process_buffer(pieceOfString, len);
+			    o = usbblaster_process_buffer(pieceOfString, len);
 
-		    if (o) {
-		    Reset_TimerA1();
-#if 0 /* InBackground expects the buffer to remain unchanged */
-                    hidSendDataInBackground((BYTE*)pieceOfString,
-                        o,HID0_INTFNUM,0);                      //Echoes back the characters received (needed
-                                                                                    //for Hyperterm)
-#else
-		    hidSendDataWaitTilDone((BYTE*)pieceOfString,o,HID0_INTFNUM,0);
-#endif
-		    }
+			    if (o) {
+				    Reset_TimerA1();   // No need, the new version will only send if USB has buffer free
+				    hidSendDataWaitTilDone((BYTE*)pieceOfString,o,HID0_INTFNUM,0);
+			    }
 		    } while (len);
-
                 }
+
 		/* Flash interface handling */
+		SR_sleep=0; // FIXME Temporary
 		if (nand_ready()) {
 			int len;
 			char buf[MAX_STR_LENGTH];
@@ -166,7 +159,19 @@ int main (VOID)
 				if (len>=sizeof(struct nandreq)) {
 					hidReceiveDataInBuffer((BYTE*)&nand_state, sizeof(struct nandreq),
 							       FLASH_INTFNUM);
-					process_nandreq();
+					// Simple validation for now
+					if (nand_state.addr_bytes<8 && !(nand_state.writelen&&nand_state.readlen))
+						process_nandreq();
+					else {
+						// Invalid command, flush the buffer
+						hidReceiveDataInBuffer((BYTE*)buf, len, FLASH_INTFNUM);
+						nand_state.addr_bytes=0;
+						nand_state.writelen=0;
+						nand_state.readlen=0;
+					}
+				} else if (len) {
+					// Too small a packet, discard the data
+					hidReceiveDataInBuffer((BYTE*)buf, len, FLASH_INTFNUM);
 				}
 			} else if ((len=expect_nanddata())) {  // Yes, this is an assignment
 				len=hidReceiveDataInBuffer((BYTE*)buf,
@@ -180,7 +185,7 @@ int main (VOID)
 		} else if (nand_state.readlen) {
 			SR_sleep=0;  /* Waiting for NAND, don't sleep */
 		}
-#if 1
+
 		if (bTimerTripped_event) {  // Be sure to send status bytes now and then (16ms)
 			bTimerTripped_event = FALSE;
 			/* We don't care if this send fails, because that can only mean it wasn't needed
@@ -188,7 +193,7 @@ int main (VOID)
 			USBHID_sendData(0,0,HID0_INTFNUM);
 			USBHID_sendData(0,0,FLASH_INTFNUM);
 		}
-#endif
+
                 break;
 
             case ST_ENUM_SUSPENDED:
@@ -371,7 +376,7 @@ VOID Init_TimerA1 (VOID)
 {
 	// Count at ACLK/2 = 32768Hz/2 = 16384Hz
 	// Chosen such that we can use one RLAM to do *16 for latency timer
-	TA1CCR0 = 16*(32768/1024/2);  // default timeout 16ms
+	TA1CCR0 = 16*(32768/1024/2);  // default timeout 16ms (roughly - 16384)
 	TA1CCTL0 = CCIE;                                        //CCR0 interrupt enabled
 	Reset_TimerA1();
 }
