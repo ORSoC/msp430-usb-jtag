@@ -55,12 +55,13 @@ extern "C"
 
 // Configuration Constants that can change
 // #define that relates to Device Descriptor
-#if 1  /* Altera */
+#if 0  /* Altera */
 #define USB_VID               0x09fb        // Vendor ID (VID)
+#define USB_PID               0x6001        // Product ID (PID)
 #else  /* FTDI */
 #define USB_VID 0x0403
+#define USB_PID               0x6010        // Product ID (PID)
 #endif
-#define USB_PID               0x6001        // Product ID (PID)
 /*----------------------------------------------------------------------------+
 | Firmware Version                                                            |
 | How to detect version number of the FW running on MSP430?                   |
@@ -76,20 +77,27 @@ extern "C"
  #define PHDC_ENDPOINTS_NUMBER               2  // bulk in, bulk out
 
 /* We do not use HID, so need no report descriptors. Nor have we activated CDC yet. */
-#define DESCRIPTOR_TOTAL_LENGTH             (SIZEOF_CONFIG_DESCRIPTOR+SIZEOF_INTERFACE_DESCRIPTOR+ \
-		2*SIZEOF_ENDPOINT_DESCRIPTOR)    // wTotalLength, This is the sum of configuration descriptor length  + CDC descriptor length  + HID descriptor length
-#define USB_NUM_INTERFACES                  1    // Number of implemented interfaces.
+#define DESCRIPTOR_TOTAL_LENGTH             (SIZEOF_CONFIG_DESCRIPTOR+2*(SIZEOF_INTERFACE_DESCRIPTOR+ \
+								       2*SIZEOF_ENDPOINT_DESCRIPTOR))
+	// wTotalLength, This is the sum of configuration descriptor length  + CDC descriptor length  + HID descriptor length
+#define USB_NUM_INTERFACES                  2    // Number of implemented interfaces.
 
+/* We have modified the HID stack to support use for FTDI style bulk channels */
 #define HID0_REPORT_INTERFACE              0              // Report interface number of HID0
 #define HID0_OUTEP_ADDR                    0x02           // Output Endpoint number of HID0
 #define HID0_INEP_ADDR                     0x81           // Input Endpoint number of HID0
 
+#define HID1_REPORT_INTERFACE              1              // Report interface number of HID1
+#define HID1_OUTEP_ADDR                    0x04           // Output Endpoint number of HID1
+#define HID1_INEP_ADDR                     0x83           // Input Endpoint number of HID1
+
 #define CDC_NUM_INTERFACES                   0           //  Total Number of CDCs implemented. should set to 0 if there are no CDCs implemented.
-#define HID_NUM_INTERFACES                   1           //  Total Number of HIDs implemented. should set to 0 if there are no HIDs implemented.
+#define HID_NUM_INTERFACES                   2           //  Total Number of HIDs implemented. should set to 0 if there are no HIDs implemented.
 #define MSC_NUM_INTERFACES                   0           //  Total Number of MSCs implemented. should set to 0 if there are no MSCs implemented.
 #define PHDC_NUM_INTERFACES                  0           //  Total Number of PHDCs implemented. should set to 0 if there are no PHDCs implemented.
 // Interface numbers for the implemented CDSs and HIDs, This is to use in the Application(main.c) and in the interupt file(UsbIsr.c).
-#define HID0_INTFNUM                0
+#define HID0_INTFNUM                HID0_REPORT_INTERFACE
+#define FLASH_INTFNUM		    HID1_REPORT_INTERFACE
 #define MSC_MAX_LUN_NUMBER                   1           // Maximum number of LUNs supported
 
 #define PUTWORD(x)      ((x)&0xFF),((x)>>8)
@@ -99,7 +107,7 @@ extern "C"
 // MCLK frequency of MCU, in Hz
 // For running higher frequencies the Vcore voltage adjustment may required.
 // Please refer to Data Sheet of the MSP430 device you use
-#define USB_MCLK_FREQ 8000000                // MCLK frequency of MCU, in Hz
+#define USB_MCLK_FREQ 16000000                // MCLK frequency of MCU, in Hz
 #define USB_PLL_XT        2                  // Defines which XT is used by the PLL (1=XT1, 2=XT2)
 #if ORDB3A
 #define USB_XT_FREQ_VALUE 24.0

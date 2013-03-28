@@ -161,6 +161,7 @@ __interrupt VOID iUsbInterruptHandler(VOID)
     case USBVECINT_INPUT_ENDPOINT2:
             break;
     case USBVECINT_INPUT_ENDPOINT3:
+      bWakeUp = HidToHostFromBuffer(FLASH_INTFNUM);
       break;
     case USBVECINT_INPUT_ENDPOINT4:
       break;
@@ -190,6 +191,19 @@ __interrupt VOID iUsbInterruptHandler(VOID)
     case USBVECINT_OUTPUT_ENDPOINT3:
       break;
     case USBVECINT_OUTPUT_ENDPOINT4:
+      //call callback function if no receive operation is underway
+      if (!HidIsReceiveInProgress(FLASH_INTFNUM))
+      {
+           if (wUsbEventMask & kUSB_dataReceivedEvent)
+           {
+               bWakeUp = USBHID_handleDataReceived(FLASH_INTFNUM); 
+           }
+      }
+      else
+      {
+           //complete receive opereation - copy data to user buffer 
+           bWakeUp = HidToBufferFromHost(FLASH_INTFNUM);
+      } 
       break;
     case USBVECINT_OUTPUT_ENDPOINT5:
       break;

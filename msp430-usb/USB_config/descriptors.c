@@ -131,6 +131,47 @@ const struct abromConfigurationDescriptorGroup abromConfigurationDescriptorGroup
             0,                                  // bInterval, ms
 
 	         /* end of HID[0]*/
+        },
+	/*start HID[1] Here - actually not HID but bulk (emulating FTDI) used for NAND */
+        {
+            //-------- Descriptor for HID class device -------------------------------------
+            // INTERFACE DESCRIPTOR (9 bytes) 
+            SIZEOF_INTERFACE_DESCRIPTOR,        // bLength 
+            DESC_TYPE_INTERFACE,                // bDescriptorType: 4 
+            HID1_REPORT_INTERFACE,              // bInterfaceNumber
+            0x00,                               // bAlternateSetting
+            2,                                  // bNumEndpoints
+            0xFF,                               // bInterfaceClass: 3 = HID Device, FF=vendor specific
+            0xFF,                               // bInterfaceSubClass:
+            0xFF,                               // bInterfaceProtocol:
+            INTF_STRING_INDEX + 0,              // iInterface:1
+
+#if 0
+            // HID DESCRIPTOR (9 bytes)
+            0x09,     			                // bLength of HID descriptor
+            0x21,             		            // HID Descriptor Type: 0x21
+            0x01,0x01,			                // HID Revision number 1.01
+            0x00,			                    // Target country, nothing specified (00h)
+            0x01,			                    // Number of HID classes to follow
+            0x22,			                    // Report descriptor type
+			 (report_desc_size_HID0 & 0x0ff),  // Total length of report descriptor
+ 			 (report_desc_size_HID0  >> 8),
+#endif
+            SIZEOF_ENDPOINT_DESCRIPTOR,         // bLength
+            DESC_TYPE_ENDPOINT,                 // bDescriptorType
+            HID1_INEP_ADDR,                     // bEndpointAddress; bit7=1 for IN, bits 3-0=1 for ep1
+            EP_DESC_ATTR_TYPE_BULK,              // bmAttributes, interrupt transfers
+            0x40, 0x00,                         // wMaxPacketSize, 64 bytes
+            0,                                  // bInterval, ms
+
+            SIZEOF_ENDPOINT_DESCRIPTOR,         // bLength
+            DESC_TYPE_ENDPOINT,                 // bDescriptorType
+            HID1_OUTEP_ADDR,                    // bEndpointAddress; bit7=1 for IN, bits 3-0=1 for ep1
+            EP_DESC_ATTR_TYPE_BULK,              // bmAttributes, interrupt transfers
+            0x40, 0x00,                         // wMaxPacketSize, 64 bytes
+            0,                                  // bInterval, ms
+
+	         /* end of HID[1]*/
         }
 
     }
@@ -151,11 +192,10 @@ BYTE const abromStringDescriptor[] = {
 	2, 3,	// Empty string
 #else
 	// String index1, Manufacturer
-	36,		// Length of this string descriptor
+	2+2*8,		// Length of this string descriptor
 	3,		// bDescriptorType
 	'O',0x00,'R',0x00,'S',0x00,'o',0x00,'C',0x00,' ',0x00,
-	'A',0x00,'B',0x00,' ',0x00,' ',0x00,' ',0x00,' ',0x00,
-	' ',0x00,' ',0x00,' ',0x00,' ',0x00,' ',0x00,
+	'A',0x00,'B',0x00,
 #endif
 
 #if 1
@@ -231,9 +271,22 @@ const struct tUsbHandle stUsbHandle[]=
         OEP2_Y_BUFFER_ADDRESS,
         IEP1_X_BUFFER_ADDRESS,
         IEP1_Y_BUFFER_ADDRESS
+	},
+	{
+        HID1_INEP_ADDR,
+        HID1_OUTEP_ADDR,
+        0, 
+        HID_CLASS,
+        0,
+        0,
+        OEP4_X_BUFFER_ADDRESS,
+        OEP4_Y_BUFFER_ADDRESS,
+        IEP3_X_BUFFER_ADDRESS,
+        IEP3_Y_BUFFER_ADDRESS
     }
 };
 //-------------DEVICE REQUEST LIST---------------------------------------------
+extern void Report_NAND(int ifnum);
 /* Ignore FTDI specific device set requests (such as modes and baud rates) */
 BYTE usbSetVendor(VOID) {
 	/* Just acknowledge the data without using it */
@@ -247,6 +300,7 @@ extern __no_init tDEVICE_REQUEST __data16 tSetupPacket;
 BYTE usbSetLatencyTimer(VOID) {
 	TA1CCR0 = tSetupPacket.wValue*(32768/1024/2);
         usbSendZeroLengthPacketOnIEP0();
+	//Report_NAND(HID0_REPORT_INTERFACE); // Abuse this part of initialization to report NAND type
 	return (FALSE);
 }
 BYTE usbGetLatencyTimer(VOID) {
@@ -275,6 +329,16 @@ BYTE usbDisconnectThenBSL(VOID) {
 	return (FALSE);
 }
 
+#if 0
+/* Ugly hack: Send the NAND Flash info when someone starts to talk to USB Blaster */
+BYTE clearEpAndReportFlash(VOID) {
+	// Turns out to work against altera, but not urjtag
+	BYTE ret=usbClearEndpointFeature();
+	Report_NAND(HID0_REPORT_INTERFACE);
+	return ret;
+}
+#endif
+
 const tDEVICE_REQUEST_COMPARE tUsbRequestList[] = 
 {
 	/* FTDI latency timer set/get */
@@ -292,7 +356,17 @@ const tDEVICE_REQUEST_COMPARE tUsbRequestList[] =
 	USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_DEVICE,
 	USB_REQ_SET_FEATURE, PUTWORD(1), PUTWORD(0), PUTWORD(0),
 	0xff, &usbDisconnectThenBSL,
-	
+
+#if 0
+    // clear endpoint feature -- used to detect new programs talking to interface
+    USB_REQ_TYPE_OUTPUT | USB_REQ_TYPE_STANDARD | USB_REQ_TYPE_ENDPOINT,
+    USB_REQ_CLEAR_FEATURE,
+    FEATURE_ENDPOINT_STALL,0x00,
+    HID0_INEP_ADDR,0x00,
+    0x00,0x00,
+    0xff,&clearEpAndReportFlash,
+#endif
+
 #if 0
     //---- HID 0 Class Requests -----//
     USB_REQ_TYPE_INPUT | USB_REQ_TYPE_CLASS | USB_REQ_TYPE_INTERFACE,
