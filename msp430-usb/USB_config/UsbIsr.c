@@ -84,7 +84,7 @@ __interrupt VOID iUsbInterruptHandler(VOID)
         bWakeUp = SetupPacketInterruptHandler();  
         USBIFG &= ~SETUPIFG;    // clear the interrupt bit
     }   
-    switch (__even_in_range(USBVECINT & 0x3f, USBVECINT_OUTPUT_ENDPOINT7))
+    switch (__even_in_range(USBVECINT & 0x3e, USBVECINT_OUTPUT_ENDPOINT7))
     {
     case USBVECINT_NONE:
       break;
