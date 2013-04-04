@@ -198,9 +198,10 @@ unsigned int boardInitOrdb3a(void)
 
 		PWR_EN_ON;	// At this point, PM chip will power up all the other rails
 		LED_ON;  // power management chip detected, so far so good
+		break;  // done configuring
 
 	//TODO: init FPGA;
-	} while (0);
+	} while (1);
 
 	return result;
 }

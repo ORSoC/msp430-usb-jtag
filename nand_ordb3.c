@@ -8,6 +8,14 @@
 
 #include <nand_ordb3.h>
 
+#define LIBXSVF
+#ifdef LIBXSVF
+#include <stdlib.h>  /* for realloc() */
+#include <string.h>  /* for memcpy() */
+#include <libxsvf.h>
+#include <jtag.h>    /* For libxsvf JTAG operations */
+#endif
+
 // Port J is mapped as port 19 if you extrapolate from 1/2, 3/4 etc
 #define J 19
 #define P19DIR PJDIR
@@ -44,10 +52,20 @@
 # error //Need to correct pin mappings
 #endif
 
-#define ROWBYTES 3
+#define ROWBYTES (geom.addresscycles&0x0f)
 typedef long row_t;
 struct nandreq nand_state;
 
+static struct nandgeom {
+	uint32_t bytesperpage;
+	uint32_t sparebytesperpage;
+	uint32_t bytesperpartialpage;
+	uint32_t sparebytesperpartialpage;
+	uint32_t pagesperblock;
+	uint32_t blocksperlun;
+	uint8_t luns, addresscycles;
+} geom;
+static int colbits, rowbits;
 
 static inline void nand_init(void) {
 	P5OUT |= CEn_BIT;
@@ -300,6 +318,18 @@ int nand_probe(char *buf, int size) {
 	}
 	// Read ID strings
 	ordb3_nand_read_buf(buf+4+1, 32);
+	for (i=64; i<80; i++) {
+		ordb3_nand_read_byte();
+	}
+	ordb3_nand_read_buf((void*)&geom, sizeof geom);
+	colbits=0;
+	for (i=1; i<geom.pagesperblock; i<<=1)
+		colbits++;
+	rowbits=0;
+	for (i=1; i<geom.blocksperlun; i<<=1)
+		rowbits++;
+	for (i=1; i<geom.luns; i<<=1)
+		rowbits++;
 	return 4+1+32;
 }
 
@@ -308,22 +338,133 @@ static char nandreport[61];
 void Do_NAND_Probe(void) {
 	nandreport_size = nand_probe(nandreport, sizeof nandreport);
 }
-void Report_NAND(int ifnum) {
-	USBHID_sendData(nandreport,nandreport_size,ifnum);
-}
 
 
-#if 0
+#ifdef LIBXSVF
 /* XSVF player connection */
-#include <libxsvf.h>
 
-struct nand_state {
-	enum { disconnect, idle, reading, erasing, writing } state;
-	unsigned blocks[32];	// List of blocks holding XSVF data
-	int byteinpage, pageinblock, blockinlist;
-} nand_state;
+#define MAXBLOCKS 32
+struct xsvfnand_state {
+	//enum { disconnect, idle, reading, erasing, writing } state;
+	unsigned blocks[MAXBLOCKS];	// List of blocks holding XSVF data
+	int bytesleftinpage, pageinblock, blockinlist;
+} xsvf_nand_state;
 
 // TODO: Find out if libxsvf might be improved to support async reading.
+// (in short: not easily. it does read in command chunks though, so 
+// perhaps we can break the loop.)
+enum cache_mode { Uncached=0x30, Cached=0x31, Last=0x3f };
+static void nand_loadpage(uint32_t block, uint32_t page, enum cache_mode mode) {
+	long timeout;
+	/* Column address (page in block) first, row address (block) second */
+	/*
+	uint32_t col=page&(geom.pagesperblock-1);
+	uint32_t row=page>>colbits;
+	*/
+	int i;
+
+	for (timeout=-1; timeout && !nand_ready(); --timeout)
+		;  // Wait until flash chip ready
+	nand_CLE(1);
+	nand_write_byte(0x00);  // Read mode
+	nand_CLE(0);
+	nand_ALE(1);
+	for (i=geom.addresscycles>>4; i--; page>>=8)
+		nand_write_byte(page);
+	for (i=geom.addresscycles&0x0f; i--; block>>=8)
+		nand_write_byte(block);
+	nand_ALE(0);
+	nand_CLE(1);
+	nand_write_byte(mode);
+	nand_CLE(0);
+	/* At this point, the page is being fetched from flash. 
+	   Wait for R/Bn before reading data, and check status register
+	   for ECC failures. If cached, the previously fetched page is 
+	   readable currently. */
+	for (timeout=-1; timeout && !nand_ready(); --timeout)
+		;  // Wait until flash chip ready
+}
+
+static int xsvf_setup(struct libxsvf_host *h) {
+	nand_init();
+
+	xsvf_nand_state.bytesleftinpage=geom.bytesperpage;
+	xsvf_nand_state.pageinblock=2;
+	xsvf_nand_state.blockinlist=0;
+	
+	// Load page 0 for block list
+	nand_loadpage(0, 0, Uncached);
+	ordb3_nand_read_buf((void*)&xsvf_nand_state.blocks, sizeof(xsvf_nand_state.blocks));
+	/* Start loading first page */
+	nand_loadpage(xsvf_nand_state.blocks[0],0,Cached);
+	/* Start loading second page */
+	nand_loadpage(xsvf_nand_state.blocks[0],1,Cached);
+	// At this point, the first page should be ready to read. 
+	// The second page is loaded (or will be).
+	return 0;
+}
+
+static int xsvf_shutdown(struct libxsvf_host *h) {
+	nand_close();
+	return 0;
+}
+
+static void xsvf_udelay(struct libxsvf_host *h, long usecs, int tms, long num_tck) {
+	while (num_tck) {
+		pulse_tck(h,tms,-1,-1,0,0);
+	}
+}
+
+static int xsvf_getbyte(struct libxsvf_host *h) {
+	if (!--xsvf_nand_state.bytesleftinpage) {
+		/* Need to start on a new page */
+		int bil=xsvf_nand_state.blockinlist;
+		nand_loadpage(xsvf_nand_state.blocks[bil], xsvf_nand_state.pageinblock, Cached);
+		xsvf_nand_state.bytesleftinpage=geom.bytesperpage;
+		if (++xsvf_nand_state.pageinblock>=geom.pagesperblock) {
+			/* New block */
+			if (bil<MAXBLOCKS) {
+				xsvf_nand_state.blockinlist=bil+1;
+				xsvf_nand_state.pageinblock=0;
+			} else {
+				/* End of block list, but we still have a page on its way. */
+				xsvf_nand_state.pageinblock--;  // Repeat last page
+			}
+		}
+	}
+	return ordb3_nand_read_byte();
+}
+
+void xsvf_report_error(struct libxsvf_host *h, const char *file, int line, const char *message) {
+	/* Nothing to be done as yet */
+}
+
+void *xsvf_realloc(struct libxsvf_host *h, void *ptr, int size, enum libxsvf_mem which) {
+	/* There are 36 different possible buffers, we may well make them static */
+	/* Actually in use are only 5 or so? */
+	static int sizes[LIBXSVF_MEM_NUM];
+	if (size>sizes[which]) {
+		void *newptr=malloc(size);
+		if (ptr) {
+			if (newptr)
+				memcpy(newptr, ptr, sizes[which]);
+			free(ptr);
+		}
+		sizes[which]=newptr?size:0;
+		return newptr;
+	} else
+		return ptr;
+}
+
+const struct libxsvf_host xsvf_host={
+	.setup=xsvf_setup,
+	.shutdown=xsvf_shutdown,
+	.udelay=xsvf_udelay,
+	.getbyte=xsvf_getbyte,
+	.pulse_tck=pulse_tck,
+	.report_error=xsvf_report_error,
+	.realloc=xsvf_realloc,
+};
 
 #endif
 
@@ -333,15 +474,19 @@ void process_nandreq(void) {
 	nand_CLE(0);
 }
 void process_nanddata(char *data, int len) {
+	/* Note that trailing commands are not allowed! */
 	if (len && nand_state.addr_bytes) {
+		int alen = nand_state.addr_bytes;
+		if (len<alen) alen=len;
 		nand_ALE(1);
-		while (len-- && nand_state.addr_bytes--)
-			nand_write_byte(*data++);
+		ordb3_nand_write_buf(data, alen);
 		nand_ALE(0);
+		len-=alen;
 	}
 	if (len && nand_state.writelen) {
-		while (len-- && nand_state.writelen--)
-			nand_write_byte(*data++);
+		int wrlen = nand_state.writelen;
+		if (len<wrlen) wrlen=len;
+		ordb3_nand_write_buf(data, wrlen);
 	}
 }
 int produce_nanddata(char *data, int len) {

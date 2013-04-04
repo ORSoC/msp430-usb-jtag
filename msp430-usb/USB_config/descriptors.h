@@ -55,7 +55,7 @@ extern "C"
 
 // Configuration Constants that can change
 // #define that relates to Device Descriptor
-#if 0  /* Altera */
+#if 1  /* Altera */
 #define USB_VID               0x09fb        // Vendor ID (VID)
 #define USB_PID               0x6001        // Product ID (PID)
 #else  /* FTDI */

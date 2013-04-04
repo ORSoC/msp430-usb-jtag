@@ -139,13 +139,13 @@ uint8_t jtag_shift_bits(uint8_t tdi, uint8_t tms, uint8_t len) {
 		P4OUT = (P4OUT&mask)|set;	// Set TMS and TDI
 		tdo = (tdo>>1) | (P4IN&BIT2?0x80:0x00);	// read TDO
 		
-		/* Raise clock */
+		/* Raise TCK */
 		P4OUT |= BIT3;
 		
 		/* Shift the other registers */
 		tdi >>= 1;
 		tms >>= 1;
-		/* Lower clock */
+		/* Lower TCK */
 		P4OUT &= ~BIT3;
 	}
 	return tdo;
@@ -299,3 +299,21 @@ int usbblaster_process_buffer(uint8_t *buf, int len) {
 
 	return o;
 }
+
+int pulse_tck(struct libxsvf_host *h, int tms, int tdi, int tdo, int rmask, int sync) {
+	int line_tdo;
+	if (tms)
+		P4OUT |= BIT0;
+	else
+		P4OUT &=~BIT0;
+	if (tdi)	/* may be -1 for don't care */
+		P4OUT |= BIT1;
+	else
+		P4OUT &=~BIT1;
+	/* Pulse TCK low (this is odd, as it idles low in spec) */
+	P4OUT &= ~BIT3;
+	P4OUT |= BIT3;
+	line_tdo = (P4IN&BIT2)>>2;
+	return tdo < 0 || line_tdo == tdo ? line_tdo : -1;
+}
+

@@ -186,21 +186,20 @@ def writeimage(onfi, image):
         pages.append(pageno)
         offset+=len(pagedata)
         pageno+=1
-    # Write block list to page 0
-    blocklist=struct.pack('<%dI'%(len(pages)), *pages)
+    # Write block list to page 0, terminated with all 1s
+    blocklist=struct.pack('<%dI'%(len(pages)), *pages)+'\xff\xff\xff\xff'
     page0data=blocklist+page0data[len(blocklist):]
     onfi.programpagewithverify(0,page0data)
     return pages
     
 def main():
     #ser=open('/dev/ttyUSB1','rb+')
-    try:
-        ser=UsbConn()
-    except:
-        ser=UsbConn()
+    ser=UsbConn()
     #ser.write('\0'*(256+2**16+6))   # Enough blank data to clear NAND state
     # Sync protocol might not be needed. We use start of a USB packet to parse
-    # commands. 
+    # commands. If we receive a command that does not look valid, we flush that
+    # buffer. So sending a lot of 0 followed by two short frames should bring
+    # us in sync. On the other hand, we've never been out of sync yet. 
     onfi=ONFI(ser)
     #print "Parameter page:", repr(onfi.parampage)
     print "Found %s %s capacity %g mebibytes"%(onfi.vendor,onfi.model,
