@@ -150,19 +150,23 @@ int main (VOID)
                 }
 
 		/* Flash interface handling */
-		SR_sleep=0; // FIXME Temporary
+		stay_awake();
 		if (nand_ready()) {
 			int len;
 			char buf[MAX_STR_LENGTH];
 			if (expect_nandreq()) {
 				len=USBHID_bytesInUSBBuffer(FLASH_INTFNUM);
 				if (len>=sizeof(struct nandreq)) {
+					/* Unlock flash */
+					//PJOUT |= BIT2;  // raise WPn
 					hidReceiveDataInBuffer((BYTE*)&nand_state, sizeof(struct nandreq),
 							       FLASH_INTFNUM);
 					// Simple validation for now
-					if (nand_state.addr_bytes<8 && !(nand_state.writelen&&nand_state.readlen))
+					if (nand_state.addr_bytes<8 &&
+					    !(nand_state.writelen&&nand_state.readlen)) {
 						process_nandreq();
-					else {
+						stay_awake();
+					} else {
 						// Invalid command, flush the buffer
 						hidReceiveDataInBuffer((BYTE*)buf, len, FLASH_INTFNUM);
 						nand_state.addr_bytes=0;
@@ -177,13 +181,19 @@ int main (VOID)
 				len=hidReceiveDataInBuffer((BYTE*)buf,
 							   sizeof(buf)<len?sizeof(buf):len,
 							   FLASH_INTFNUM);
-				process_nanddata(buf, len);
+				if (len) {
+					process_nanddata(buf, len);
+					stay_awake();
+				}
 			} else if (nand_state.readlen) {
+				/* FIXME now that we have multiple interfaces, we must not 
+				   spin on one of them like this... */
 				len=produce_nanddata(buf, sizeof(buf)<62?sizeof(buf):62);
 				hidSendDataWaitTilDone((BYTE*)buf,len,FLASH_INTFNUM,0);
+				stay_awake();
 			}
-		} else if (nand_state.readlen) {
-			SR_sleep=0;  /* Waiting for NAND, don't sleep */
+		} else if (nand_state.readlen || USBHID_bytesInUSBBuffer(FLASH_INTFNUM)) {
+			stay_awake();  /* Waiting for NAND, don't sleep */
 		}
 
 		if (bTimerTripped_event) {  // Be sure to send status bytes now and then (16ms)
