@@ -150,7 +150,7 @@ int main (VOID)
                 }
 
 		/* Flash interface handling */
-		stay_awake();
+		//stay_awake();
 		if (nand_ready()) {
 			int len;
 			char buf[MAX_STR_LENGTH];
@@ -158,7 +158,7 @@ int main (VOID)
 				len=USBHID_bytesInUSBBuffer(FLASH_INTFNUM);
 				if (len>=sizeof(struct nandreq)) {
 					/* Unlock flash */
-					//PJOUT |= BIT2;  // raise WPn
+					PJOUT |= BIT2;  // raise WPn
 					hidReceiveDataInBuffer((BYTE*)&nand_state, sizeof(struct nandreq),
 							       FLASH_INTFNUM);
 					// Simple validation for now
@@ -182,7 +182,16 @@ int main (VOID)
 							   sizeof(buf)<len?sizeof(buf):len,
 							   FLASH_INTFNUM);
 				if (len) {
+					int origwrlen=nand_state.writelen;
 					process_nanddata(buf, len);
+					if (origwrlen!=nand_state.writelen) {
+						if (nand_state.writelen)
+							USBHID_sendData((BYTE*)&nand_state.writelen,
+									2,FLASH_INTFNUM);
+						else
+							hidSendDataWaitTilDone((BYTE*)&nand_state.writelen,
+									2,FLASH_INTFNUM,0);
+					}
 					stay_awake();
 				}
 			} else if (nand_state.readlen) {
