@@ -68,11 +68,7 @@ class UsbConn:
             #print len(pack), size, repr(pack)
         return ''.join(map(str,packs))
     def write(self,data):
-        written=0
-        while data:
-            written+=self.h.bulkWrite(self.outep, data[:64], 5000)
-            data=data[written:]
-        return written
+        return self.h.bulkWrite(self.outep, data, 5000)
 
 class ONFI:
     def __init__(self, conn):
@@ -84,11 +80,12 @@ class ONFI:
          bytesperpartialpage, spareperpartialpage,  # obsolete
          self.pagesperblock, self.blocksperunit, self.units,
          addresscycles)=struct.unpack('<IHIHIIBB',self.parampage[80:102])
-        self.blockaddressbytes=addresscycles &0x0f
-        self.pageaddressbytes=addresscycles  >>4
+        self.rowaddressbytes=addresscycles &0x0f
+        self.columnaddressbytes=addresscycles  >>4
         self.totalpages=self.pagesperblock*self.blocksperunit*self.units
         #self.pageaddressbits=bitsforaddress(self.pagesperblock)
     def loadpage(self, pageno):
+        print "Loading page", pageno
         self.command(0x00, self.pagetoaddress(pageno))  # load address
         self.command(0x30)  # Request read
         while True:
@@ -106,8 +103,11 @@ class ONFI:
             # Default to reading the rest of the page
             size=self.bytesperpage+self.spareperpage-start
         self.command(0x00)   # switch to read mode
-        self.command(0x05, struct.pack('<H',start))   # set start address
-        return self.command(0xe0, readlen=size)
+        if start:
+            self.command(0x05, struct.pack('<H',start))   # set start address
+            return self.command(0xe0, readlen=size)
+        else:
+            return self.command(0x00, readlen=size)
     def badblock(self, block):
         # check first and last page of the block
         for page in (0,self.pagesperblock-1):
@@ -117,7 +117,10 @@ class ONFI:
                 return True
         return False
     def eraseblock(self, block):
-        self.command(0x60, self.pagetoblockaddress(block*self.pagesperblock))
+        print "Erasing block", block,
+        address=self.pagetorowaddress(block*self.pagesperblock)
+        print "address", repr(address)
+        self.command(0x60, address)
         self.command(0xd0)
         return self.readstatus()
     def scanforbadblocks(self):
@@ -130,16 +133,18 @@ class ONFI:
         self.badblocks=badblocks
         return badblocks
     def pagetoaddress(self, page):
-        #block=page>>self.pageaddressbits
-        #pageinblock=page&(self.pagesperblock-1)
-        block,pageinblock=divmod(page,self.pagesperblock)
-        return (struct.pack('<Q',pageinblock)[:self.pageaddressbytes] +
-                struct.pack('<Q',block)[:self.blockaddressbytes])
-    def pagetoblockaddress(self, page):
-        return self.pagetoaddress(page)[-self.blockaddressbytes:]
+        return '\x00'*self.columnaddressbytes+self.pagetorowaddress(page)
+    def pagetorowaddress(self, page):
+        return struct.pack('<Q',page)[:self.rowaddressbytes]
     def command(self, cmd, address="", outdata="", readlen=0):
         cmdbytes=struct.pack('<BBHH', cmd, len(address), len(outdata), readlen)
-        self.conn.write(cmdbytes+address+outdata)
+        self.conn.write(cmdbytes+address)
+        written=0
+        while written<len(outdata):
+            print "Written %d bytes, %d left"%(written,len(outdata)-written)
+            written+=self.conn.write(outdata[written:written+64])
+            (outlen,)=struct.unpack('<H',self.conn.read(2))
+            print "FW expects %d more"%(outlen)
         return self.conn.read(readlen)
     def readparampage(self):
         return self.command(0xec, address='\0', readlen=256)
@@ -158,27 +163,30 @@ class ONFI:
         status=self.programpage(page,data)
         print "reading back page", page,
         sys.stdout.flush()
-        status=onfi.loadpage(page)
+        status=self.loadpage(page)
         if status&0x08:  # rewrite recommended
             raise IOError("Rewrite recommended for page %d (just written)"%(page))
-        readback=onfi.datafrompage(0,len(data))
+        readback=self.datafrompage(0,len(data))
         if readback!=data:
+            print "readback mismatch, wrote:", repr(data)
+            print "readback mismatch, read:", repr(readback)
             raise IOError("Readback did not match for page %d"%(page))
         print "data matched"
         sys.stdout.flush()
         return status
 
-def writeimage(onfi, image):
+def writeimage(onfi, image, indexblock=0):
     """Write an image to early blocks of the flash.
     Each page is written from page 1 onwards (blocks are preerased),
     with page 0 holding the list of pages used, which is also returned.
     Pages are verified by read back as they are written, and pages that
     are deemed unusable will be skipped over."""
-    onfi.loadpage(0)
+    onfi.loadpage(indexblock*onfi.pagesperblock)
     page0data=onfi.datafrompage()
     pages=[]
     offset=0
-    pageno=1  # May want to start at a later block to not write block 0 too often
+    # May want to start at a later block to not write block 0 too often
+    pageno=(indexblock+1)*onfi.pagesperblock
     block=None   # Always erase first block
     tries=0
     while offset<len(image):
@@ -193,6 +201,7 @@ def writeimage(onfi, image):
         try:
             status=onfi.programpagewithverify(pageno,pagedata)
         except IOError, e:
+            raise
             traceback.print_exc()
             # skip entire block, because firmware reads entire blocks
             pageinblock=pageno%onfi.pagesperblock
@@ -221,10 +230,10 @@ def readimage(onfi):
     print "Block list:", blocklist
     data=[]
     for block in blocklist:
-        if 0<block<onfi.blocksperunit*onfi.units:
+        if 0<block<onfi.totalpages:
             print "Reading block", block
             for page in range(onfi.pagesperblock):
-                onfi.loadpage(block*onfi.pagesperblock+page)
+                onfi.loadpage(block+page)
                 data.append(onfi.datafrompage(size=onfi.bytesperpage))
         else:
             break
@@ -252,6 +261,8 @@ def main(argv):
         for page in range(int(argv[2])):
             onfi.loadpage(page)
             print repr(onfi.datafrompage())
+    if argv[1]=='erase':
+        onfi.eraseblock(0)
 
 if __name__=='__main__':
     from sys import argv
