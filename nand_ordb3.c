@@ -490,11 +490,14 @@ void process_nanddata(char *data, int len) {
 		ordb3_nand_write_buf(data, alen);
 		nand_ALE(0);
 		len-=alen;
+		nand_state.addr_bytes-=alen;
+		data+=alen;
 	}
 	if (len && nand_state.writelen) {
 		int wrlen = nand_state.writelen;
 		if (len<wrlen) wrlen=len;
 		ordb3_nand_write_buf(data, wrlen);
+		nand_state.writelen-=wrlen;
 	}
 }
 int produce_nanddata(char *data, int len) {
