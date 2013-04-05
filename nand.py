@@ -26,10 +26,10 @@ def countones(n):
     return count
 
 class UsbConn:
-    def __init__(self, vid=0x09fb, pid=0x6001, iface=1): #vid=0x0403, pid=0x6010):
+    def __init__(self, vids=(0x09fb, 0x0403), pids=(0x6001, 0x6010), iface=1):
         for bus in usb.busses():
             for dev in bus.devices:
-                if dev.idVendor==vid and dev.idProduct==pid:
+                if dev.idVendor in vids and dev.idProduct in pids:
                     self.dev=dev
         if not hasattr(self,"dev"):
             raise ValueError("Device not found")
