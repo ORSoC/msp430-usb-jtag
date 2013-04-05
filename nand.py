@@ -1,7 +1,7 @@
 #! /usr/bin/env python
 
 # Host side interface to ORDB3 NAND Flash, through MSP430 microcontroller
-import struct, usb, array
+import struct, usb, traceback, sys
 
 # NAND command serialization:
 #  <B  command byte
@@ -50,19 +50,29 @@ class UsbConn:
                             self.inep=epno
                         else:
                             self.outep=epno
+        assert self.inep and self.outep, "Interface %d endpoints not found"%(iface)
+        try:
+            self.h.detachKernelDriver(iface)
+        except:
+            pass
+        self.h.claimInterface(iface)
     def read(self,size):
         # filter out 31 60 headers as libftdi does
         packs=[]
         statuswords=size//62+1
         while size>0:
             # TODO: read in a large URB then filter
-            pack=bytearray(self.h.bulkRead(self.inep, min(size+2,64))[2:])
+            pack=bytearray(self.h.bulkRead(self.inep, min(size+2,64), 5000)[2:])
             size-=len(pack)
             packs.append(pack)
             #print len(pack), size, repr(pack)
         return ''.join(map(str,packs))
     def write(self,data):
-        return self.h.bulkWrite(self.outep, data)
+        written=0
+        while data:
+            written+=self.h.bulkWrite(self.outep, data[:64], 5000)
+            data=data[written:]
+        return written
 
 class ONFI:
     def __init__(self, conn):
@@ -134,20 +144,28 @@ class ONFI:
     def readparampage(self):
         return self.command(0xec, address='\0', readlen=256)
     def readstatus(self):
-        "Status register. 80=write enabled, 40=ready, 08=rewrite recommended, 01=error"
+        "Status register. 80=write enabled, 40=ready, 08=rewrite recommended, 02=cached error, 01=error"
         return ord(self.command(0x70, readlen=1))
     def programpage(self, page, data):
+        if not self.readstatus() & 0x80:
+            raise IOError("Tried to program read-only nand")
         self.command(0x80,self.pagetoaddress(page),data)  # Load address and data
         self.command(0x10)  # program to flash
         return self.readstatus()
     def programpagewithverify(self, page, data):
+        print "programming page", page,
+        sys.stdout.flush()
         status=self.programpage(page,data)
+        print "reading back page", page,
+        sys.stdout.flush()
         status=onfi.loadpage(page)
         if status&0x08:  # rewrite recommended
             raise IOError("Rewrite recommended for page %d (just written)"%(page))
         readback=onfi.datafrompage(0,len(data))
         if readback!=data:
             raise IOError("Readback did not match for page %d"%(page))
+        print "data matched"
+        sys.stdout.flush()
         return status
 
 def writeimage(onfi, image):
@@ -175,8 +193,11 @@ def writeimage(onfi, image):
         try:
             status=onfi.programpagewithverify(pageno,pagedata)
         except IOError, e:
-            print e
-            pageno+=1
+            traceback.print_exc()
+            # skip entire block, because firmware reads entire blocks
+            pageinblock=pageno%onfi.pagesperblock
+            pageno=(pageno|(onfi.pagesperblock-1))+1
+            offset-=onfi.bytesperpage*pageinblock
             tries+=1
             if tries<5:
                 continue
@@ -191,8 +212,25 @@ def writeimage(onfi, image):
     page0data=blocklist+page0data[len(blocklist):]
     onfi.programpagewithverify(0,page0data)
     return pages
+
+def readimage(onfi):
+    maxblocks=32
+    onfi.loadpage(0)
+    blocklist=struct.unpack('<%dI'%(maxblocks),
+                            onfi.datafrompage(size=32*4))
+    print "Block list:", blocklist
+    data=[]
+    for block in blocklist:
+        if 0<block<onfi.blocksperunit*onfi.units:
+            print "Reading block", block
+            for page in range(onfi.pagesperblock):
+                onfi.loadpage(block*onfi.pagesperblock+page)
+                data.append(onfi.datafrompage(size=onfi.bytesperpage))
+        else:
+            break
+    return ''.join(data)
     
-def main():
+def main(argv):
     #ser=open('/dev/ttyUSB1','rb+')
     ser=UsbConn()
     #ser.write('\0'*(256+2**16+6))   # Enough blank data to clear NAND state
@@ -204,7 +242,17 @@ def main():
     #print "Parameter page:", repr(onfi.parampage)
     print "Found %s %s capacity %g mebibytes"%(onfi.vendor,onfi.model,
                                            onfi.totalpages*onfi.bytesperpage/1024**2)
-    print "Bad blocks:", onfi.scanforbadblocks()
+    if argv[1]=='badblocks':
+        print "Bad blocks:", onfi.scanforbadblocks()
+    if argv[1]=='read':
+        open(argv[2],'wb').write(readimage(onfi))
+    if argv[1]=='write':
+        writeimage(onfi,open(argv[2],'rb').read())
+    if argv[1]=='rawread':
+        for page in range(int(argv[2])):
+            onfi.loadpage(page)
+            print repr(onfi.datafrompage())
 
 if __name__=='__main__':
-    main()
+    from sys import argv
+    main(argv)
