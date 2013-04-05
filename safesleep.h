@@ -31,6 +31,10 @@ volatile unsigned char SR_sleep, SR_sleep_mode;
 		__bic_status_register_on_exit(sleepbits);	\
 	} while (0)
 
+static inline void stay_awake(void) {
+	SR_sleep = 0;
+}
+
 static inline void enter_sleep(void) {
 	/* Ordinarily, we would use __bis_status_register(SR_sleep);
 	   However, at least in mspgcc LTS 20120406 this can compile to load+or.
