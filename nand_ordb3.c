@@ -346,7 +346,7 @@ void Do_NAND_Probe(void) {
 #define MAXBLOCKS 32
 struct xsvfnand_state {
 	//enum { disconnect, idle, reading, erasing, writing } state;
-	unsigned blocks[MAXBLOCKS];	// List of blocks holding XSVF data
+	long blocks[MAXBLOCKS];	// List of blocks holding XSVF data
 	int bytesleftinpage, pageinblock, blockinlist;
 } xsvf_nand_state;
 
@@ -394,7 +394,14 @@ static int xsvf_setup(struct libxsvf_host *h) {
 	
 	// Load page 0 for block list
 	nand_loadpage(0, 0, Uncached);
-	ordb3_nand_read_buf((void*)&xsvf_nand_state.blocks, sizeof(xsvf_nand_state.blocks));
+	ordb3_nand_read_buf((void*)&xsvf_nand_state.blocks,
+			    sizeof(xsvf_nand_state.blocks));
+
+	/* Sanity check: first block is valid and not 0 */
+	if (xsvf_nand_state.blocks[0]<=0 ||
+	    xsvf_nand_state.blocks[0]>=geom.blocksperlun*geom.luns)
+		return -1;
+
 	/* Start loading first page */
 	nand_loadpage(xsvf_nand_state.blocks[0],0,Cached);
 	/* Start loading second page */
@@ -419,7 +426,8 @@ static int xsvf_getbyte(struct libxsvf_host *h) {
 	if (!--xsvf_nand_state.bytesleftinpage) {
 		/* Need to start on a new page */
 		int bil=xsvf_nand_state.blockinlist;
-		nand_loadpage(xsvf_nand_state.blocks[bil], xsvf_nand_state.pageinblock, Cached);
+		nand_loadpage(xsvf_nand_state.blocks[bil],
+			      xsvf_nand_state.pageinblock, Cached);
 		xsvf_nand_state.bytesleftinpage=geom.bytesperpage;
 		if (++xsvf_nand_state.pageinblock>=geom.pagesperblock) {
 			/* New block */
