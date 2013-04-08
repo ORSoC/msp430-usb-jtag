@@ -59,14 +59,16 @@ class UsbConn:
     def read(self,size):
         # filter out 31 60 headers as libftdi does
         packs=[]
-        statuswords=size//62+1
+        #statuswords=size//62+1
         while size>0:
             # TODO: read in a large URB then filter
-            pack=bytearray(self.h.bulkRead(self.inep, min(size+2,64), 5000)[2:])
+            pack=bytearray(self.h.bulkRead(self.inep, min(size+2,64), 5000))
+            if not pack.startswith("\x31\x60"):
+                raise ValueError("FTDI header mismatch: got "+repr(pack))
+            del pack[:2]  # Remove FTDI header
             size-=len(pack)
-            packs.append(pack)
-            #print len(pack), size, repr(pack)
-        return ''.join(map(str,packs))
+            packs.append(str(pack))
+        return ''.join(packs)
     def write(self,data):
         return self.h.bulkWrite(self.outep, data, 5000)
 
@@ -138,13 +140,23 @@ class ONFI:
         return struct.pack('<Q',page)[:self.rowaddressbytes]
     def command(self, cmd, address="", outdata="", readlen=0):
         cmdbytes=struct.pack('<BBHH', cmd, len(address), len(outdata), readlen)
-        self.conn.write(cmdbytes+address)
+        towrite=cmdbytes+address
+        print "Writing command %r(%d) address %r(%d)"%(cmdbytes,len(cmdbytes),
+                                                       address,len(address))
+        self.conn.write(towrite)
         written=0
+        outlen=len(outdata)
         while written<len(outdata):
+            towrite=outdata[written:written+64]
+            print "Writing %d bytes: %r"%(len(towrite),towrite)
             print "Written %d bytes, %d left"%(written,len(outdata)-written)
-            written+=self.conn.write(outdata[written:written+64])
+            wrote=self.conn.write(outdata[written:written+64])
+            written+=wrote
             (outlen,)=struct.unpack('<H',self.conn.read(2))
-            print "FW expects %d more"%(outlen)
+            print "Wrote %d more, FW expects %d more"%(wrote,outlen)
+        while outlen:
+            (outlen,)=struct.unpack('<H',self.conn.read(2))
+            print "Waited for FW to sync up (%d left)"%(outlen)
         return self.conn.read(readlen)
     def readparampage(self):
         return self.command(0xec, address='\0', readlen=256)
@@ -175,15 +187,16 @@ class ONFI:
         sys.stdout.flush()
         return status
 
-def writeimage(onfi, image, indexblock=0):
+def writeimage(onfi, image, indexpage=0):
     """Write an image to early blocks of the flash.
     Each page is written from page 1 onwards (blocks are preerased),
     with page 0 holding the list of pages used, which is also returned.
     Pages are verified by read back as they are written, and pages that
     are deemed unusable will be skipped over."""
-    onfi.loadpage(indexblock*onfi.pagesperblock)
-    page0data=onfi.datafrompage()
-    pages=[]
+    indexblock=indexpage//onfi.pagesperblock
+    onfi.loadpage(indexpage)
+    indexpagedata=onfi.datafrompage()
+    blocks=[]
     offset=0
     # May want to start at a later block to not write block 0 too often
     pageno=(indexblock+1)*onfi.pagesperblock
@@ -197,6 +210,7 @@ def writeimage(onfi, image, indexblock=0):
                 block+=1
                 pageno=onfi.pagesperblock*block
             onfi.eraseblock(block)
+            blocks.append(block)
         pagedata=image[offset:offset+onfi.bytesperpage]
         try:
             status=onfi.programpagewithverify(pageno,pagedata)
@@ -213,20 +227,24 @@ def writeimage(onfi, image, indexblock=0):
             else:
                 raise IOError("Too many failed writes")
         # Page write succeeded
-        pages.append(pageno)
         offset+=len(pagedata)
         pageno+=1
     # Write block list to page 0, terminated with all 1s
-    blocklist=struct.pack('<%dI'%(len(pages)), *pages)+'\xff\xff\xff\xff'
-    page0data=blocklist+page0data[len(blocklist):]
-    onfi.programpagewithverify(0,page0data)
-    return pages
+    blocklist=struct.pack('<%dI'%(len(blocks)), *blocks)+'\xff\xff\xff\xff'
+    indexpagedata=blocklist+indexpagedata[len(blocklist):]
+    if indexblock not in blocks:
+        print "Erasing index block (%d). Warning: not keeping contents!"%indexblock
+        print "Block list stored in page %d (page %d in block %d)"%(indexpage,indexpage%onfi.pagesperblock,
+                                                                    indexblock)
+        onfi.eraseblock(indexblock)
+    onfi.programpagewithverify(indexpage,indexpagedata)
+    return blocks
 
-def readimage(onfi):
+def readimage(onfi, indexpage=0):
     maxblocks=32
-    onfi.loadpage(0)
+    onfi.loadpage(indexpage)
     blocklist=struct.unpack('<%dI'%(maxblocks),
-                            onfi.datafrompage(size=32*4))
+                            onfi.datafrompage(size=maxblocks*4))
     print "Block list:", blocklist
     data=[]
     for block in blocklist:
@@ -256,7 +274,7 @@ def main(argv):
     if argv[1]=='read':
         open(argv[2],'wb').write(readimage(onfi))
     if argv[1]=='write':
-        writeimage(onfi,open(argv[2],'rb').read())
+        blocks=writeimage(onfi,open(argv[2],'rb').read())
     if argv[1]=='rawread':
         for page in range(int(argv[2])):
             onfi.loadpage(page)
