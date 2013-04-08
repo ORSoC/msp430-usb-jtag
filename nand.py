@@ -248,10 +248,10 @@ def readimage(onfi, indexpage=0):
     print "Block list:", blocklist
     data=[]
     for block in blocklist:
-        if 0<block<onfi.totalpages:
+        if 0<=block<onfi.totalpages/onfi.pagesperblock:
             print "Reading block", block
             for page in range(onfi.pagesperblock):
-                onfi.loadpage(block+page)
+                onfi.loadpage(block*onfi.pagesperblock+page)
                 data.append(onfi.datafrompage(size=onfi.bytesperpage))
         else:
             break
