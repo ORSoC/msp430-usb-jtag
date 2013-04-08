@@ -123,7 +123,6 @@ int main (VOID)
                 break;
 
             case ST_ENUM_ACTIVE:
-		    set_sleep_mode(LPM0_bits);
 		    enter_sleep();
 
                                                                                     //Exit LPM on USB receive and perform a receive
@@ -144,13 +143,14 @@ int main (VOID)
 
 			    if (o) {
 				    Reset_TimerA1();   // No need, the new version will only send if USB has buffer free
+				    // However, either of these will do partial sends happily so we're
+				    // not sending at optimal bitrate. 
 				    hidSendDataWaitTilDone((BYTE*)pieceOfString,o,HID0_INTFNUM,0);
 			    }
 		    } while (len);
                 }
 
 		/* Flash interface handling */
-		//stay_awake();
 		if (nand_ready()) {
 			int len;
 			char buf[MAX_STR_LENGTH];
@@ -165,7 +165,6 @@ int main (VOID)
 					if (nand_state.addr_bytes<8 &&
 					    !(nand_state.writelen&&nand_state.readlen)) {
 						process_nandreq();
-						stay_awake();
 					} else {
 						// Invalid command, flush the buffer
 						hidReceiveDataInBuffer((BYTE*)buf, len, FLASH_INTFNUM);
@@ -173,9 +172,11 @@ int main (VOID)
 						nand_state.writelen=0;
 						nand_state.readlen=0;
 					}
+					stay_awake();  // So we may process further data
 				} else if (len) {
 					// Too small a packet, discard the data
 					hidReceiveDataInBuffer((BYTE*)buf, len, FLASH_INTFNUM);
+					stay_awake();
 				}
 			} else if ((len=expect_nanddata())) {  // Yes, this is an assignment
 				len=hidReceiveDataInBuffer((BYTE*)buf,
@@ -188,9 +189,14 @@ int main (VOID)
 						if (nand_state.writelen)
 							USBHID_sendData((BYTE*)&nand_state.writelen,
 									2,FLASH_INTFNUM);
-						else
-							hidSendDataWaitTilDone((BYTE*)&nand_state.writelen,
-									2,FLASH_INTFNUM,0);
+						else {
+							BYTE sendstate;
+							do {
+								// Retry until the 0 word gets through
+								sendstate=hidSendDataWaitTilDone((BYTE*)&nand_state.writelen,
+												 2,FLASH_INTFNUM,0);
+							} while (sendstate==3);
+						}
 					}
 					stay_awake();
 				}
@@ -201,7 +207,8 @@ int main (VOID)
 				hidSendDataWaitTilDone((BYTE*)buf,len,FLASH_INTFNUM,0);
 				stay_awake();
 			}
-		} else if (nand_state.readlen || USBHID_bytesInUSBBuffer(FLASH_INTFNUM)) {
+		}
+		if (nand_state.readlen || USBHID_bytesInUSBBuffer(FLASH_INTFNUM)) {
 			stay_awake();  /* Waiting for NAND, don't sleep */
 		}
 
