@@ -144,6 +144,7 @@ static void ordb3_nand_read_buf(char *buf, int len) {
 	}
 }
 
+#if 0
 #ifndef EFAULT
 #define EFAULT 14
 #endif
@@ -159,6 +160,7 @@ static int nand_verify_buf(const char *buf, int len) {
 	}
 	return 0;
 }
+#endif
 
 static uint8_t ordb3_nand_read_byte(void) {
 	char val;
@@ -486,9 +488,11 @@ void process_nanddata(char *data, int len) {
 	if (len && nand_state.addr_bytes) {
 		int alen = nand_state.addr_bytes;
 		if (len<alen) alen=len;
+
 		nand_ALE(1);
 		ordb3_nand_write_buf(data, alen);
 		nand_ALE(0);
+
 		len-=alen;
 		nand_state.addr_bytes-=alen;
 		data+=alen;
