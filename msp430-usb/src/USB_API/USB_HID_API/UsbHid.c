@@ -143,7 +143,7 @@ BYTE USBHID_sendReport (const BYTE * reportData, BYTE intfNum)
         USB_TX_memcpy(pEP1, reportData, byte_count);                                //copy data into IEP X or Y buffer
         *pCT1 = byte_count;                                                         //Set counter for usb In-Transaction
         HidWriteCtrl[INTFNUM_OFFSET(intfNum)].bCurrentBufferXY =
-            (HidWriteCtrl[INTFNUM_OFFSET(intfNum)].bCurrentBufferXY + 1) & 0x01;    //switch buffer
+		HidWriteCtrl[INTFNUM_OFFSET(intfNum)].bCurrentBufferXY ^ 0x01;    //switch buffer
         return (kUSBHID_sendComplete);
     }
     return (kUSBHID_intfBusyError);
@@ -305,7 +305,7 @@ BOOL HidToHostFromBuffer (BYTE intfNum)
         HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft = 0;
     }
 
-    if (!(tInputEndPointDescriptorBlock[edbIndex].bEPCNF & EPCNF_TOGGLE)){
+    if (HidWriteCtrl[INTFNUM_OFFSET(intfNum)].bCurrentBufferXY == X_BUFFER){
         //this is the active EP buffer
         pEP1 = (BYTE*)stUsbHandle[intfNum].iep_X_Buffer;
         pCT1 = &tInputEndPointDescriptorBlock[edbIndex].bEPBCTX;
@@ -348,6 +348,7 @@ BOOL HidToHostFromBuffer (BYTE intfNum)
 
         *pCT1 = byte_count+2;                      //Set counter for usb In-Transaction
 #endif
+	HidWriteCtrl[INTFNUM_OFFSET(intfNum)].bCurrentBufferXY ^= 1;    // Note that we swapped buffers
 
         HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft -= byte_count;
         HidWriteCtrl[INTFNUM_OFFSET(intfNum)].pHidBufferToSend += byte_count;   //move buffer pointer
@@ -378,6 +379,7 @@ BOOL HidToHostFromBuffer (BYTE intfNum)
 
 	    *pCT2 = byte_count+2;                      //Set counter for usb In-Transaction
 #endif
+	    HidWriteCtrl[INTFNUM_OFFSET(intfNum)].bCurrentBufferXY ^= 1;    // Note that we swapped buffers
 
             HidWriteCtrl[INTFNUM_OFFSET(intfNum)].nHidBytesToSendLeft -=
                 byte_count;
