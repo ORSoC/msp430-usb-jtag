@@ -11,12 +11,12 @@ LDFLAGS=-mmcu=$(MCU) -Os
 # TODO: autogenerate dependencies?
 .PHONY: all clean program
 
-all: main usbhidmain
+all: main ordb3a_firmware
 
 clean:
-	-rm main usbhidmain $(USBOBJS) libusb.a $(USBFWOBJS)
+	-rm main ordb3a_firmware $(USBOBJS) libusb.a $(USBFWOBJS)
 
-program: usbhidmain
+program: ordb3a_firmware
 	PYTHONPATH=~/msp430/python-msp430-tools python -m msp430.bsl5.hid -B -e -P $<
 
 main: main.o tps65217.o swi2cmst.o
@@ -38,7 +38,7 @@ USBOBJS=\
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_PMM.o \
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_TLV.o \
 	usbConstructs.o usbEventHandling.o
-USBFWOBJS=usbhidmain.o jtag.o msp430-usb/USB_config/descriptors.o \
+USBFWOBJS=ordb3a_main.o jtag.o msp430-usb/USB_config/descriptors.o \
 	boardinit.o tps65217.o swi2cmst.o \
 	msp430-usb/USB_config/UsbIsr.o nand_ordb3.o
 LDFLAGS += -Wl,--defsym=tSetupPacket=0x2380 -Wl,--defsym=tEndPoint0DescriptorBlock=0x0920 -Wl,--defsym=tInputEndPointDescriptorBlock=0x23C8 -Wl,--defsym=tOutputEndPointDescriptorBlock=0x2388 -Wl,--defsym=abIEP0Buffer=0x2378 -Wl,--defsym=abOEP0Buffer=0x2370
@@ -46,5 +46,5 @@ LDFLAGS += -Wl,--defsym=tSetupPacket=0x2380 -Wl,--defsym=tEndPoint0DescriptorBlo
 libusb.a: $(USBOBJS)
 	ar rsc $@ $^
 
-usbhidmain: $(USBFWOBJS) libusb.a
+ordb3a_firmware: $(USBFWOBJS) libusb.a
 
