@@ -47,4 +47,5 @@ libusb.a: $(USBOBJS)
 	ar rsc $@ $^
 
 ordb3a_firmware: $(USBFWOBJS) libusb.a
+	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS)
 
