@@ -34,6 +34,7 @@ USBOBJS=\
 	msp430-usb/src/USB_API/USB_Common/dma.o \
 	msp430-usb/src/USB_API/USB_Common/usb.o \
 	msp430-usb/src/USB_API/USB_HID_API/UsbHid.o \
+	msp430-usb/src/USB_API/USB_CDC_API/UsbCdc.o \
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_UCS.o \
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_PMM.o \
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_TLV.o \
@@ -47,5 +48,5 @@ libusb.a: $(USBOBJS)
 	ar rsc $@ $^
 
 ordb3a_firmware: $(USBFWOBJS) libusb.a
-	$(CC) $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS)
+	$(CC) -o $@ $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS)
 
