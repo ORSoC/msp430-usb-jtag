@@ -356,13 +356,9 @@ struct xsvfnand_state {
 // (in short: not easily. it does read in command chunks though, so 
 // perhaps we can break the loop.)
 enum cache_mode { Uncached=0x30, Cached=0x31, Last=0x3f };
-static void nand_loadpage(uint32_t block, uint32_t page, enum cache_mode mode) {
+static void nand_loadpage(uint32_t page, enum cache_mode mode) {
 	long timeout;
-	/* Column address (page in block) first, row address (block) second */
-	/*
-	uint32_t col=page&(geom.pagesperblock-1);
-	uint32_t row=page>>colbits;
-	*/
+	/* Column address (byte in page) first, row address (page) second */
 	int i;
 
 	for (timeout=-1; timeout && !nand_ready(); --timeout)
@@ -371,10 +367,10 @@ static void nand_loadpage(uint32_t block, uint32_t page, enum cache_mode mode) {
 	nand_write_byte(0x00);  // Read mode
 	nand_CLE(0);
 	nand_ALE(1);
-	for (i=geom.addresscycles>>4; i--; page>>=8)
+	for (i=geom.addresscycles>>4; i--; )
+		nand_write_byte(0);
+	for (i=geom.addresscycles&0x0f; i--; page>>=8)
 		nand_write_byte(page);
-	for (i=geom.addresscycles&0x0f; i--; block>>=8)
-		nand_write_byte(block);
 	nand_ALE(0);
 	nand_CLE(1);
 	nand_write_byte(mode);
@@ -395,7 +391,7 @@ static int xsvf_setup(struct libxsvf_host *h) {
 	xsvf_nand_state.blockinlist=0;
 	
 	// Load page 0 for block list
-	nand_loadpage(0, 0, Uncached);
+	nand_loadpage(0, Uncached);
 	ordb3_nand_read_buf((void*)&xsvf_nand_state.blocks,
 			    sizeof(xsvf_nand_state.blocks));
 
@@ -405,9 +401,9 @@ static int xsvf_setup(struct libxsvf_host *h) {
 		return -1;
 
 	/* Start loading first page */
-	nand_loadpage(xsvf_nand_state.blocks[0],0,Cached);
+	nand_loadpage(xsvf_nand_state.blocks[0]*geom.pagesperblock,Cached);
 	/* Start loading second page */
-	nand_loadpage(xsvf_nand_state.blocks[0],1,Cached);
+	nand_loadpage(xsvf_nand_state.blocks[0]*geom.pagesperblock+1,Cached);
 	// At this point, the first page should be ready to read. 
 	// The second page is loaded (or will be).
 	return 0;
@@ -428,7 +424,7 @@ static int xsvf_getbyte(struct libxsvf_host *h) {
 	if (!--xsvf_nand_state.bytesleftinpage) {
 		/* Need to start on a new page */
 		int bil=xsvf_nand_state.blockinlist;
-		nand_loadpage(xsvf_nand_state.blocks[bil],
+		nand_loadpage(xsvf_nand_state.blocks[bil]*geom.pagesperblock+
 			      xsvf_nand_state.pageinblock, Cached);
 		xsvf_nand_state.bytesleftinpage=geom.bytesperpage;
 		if (++xsvf_nand_state.pageinblock>=geom.pagesperblock) {
