@@ -119,19 +119,22 @@ int libxsvf_xsvf(struct libxsvf_host *h);
 int libxsvf_scan(struct libxsvf_host *h);
 int libxsvf_tap_walk(struct libxsvf_host *, enum libxsvf_tap_state);
 
+#define LIBXSVF_WITHOUT_SVF
+#define LIBXSVF_WITHOUT_SCAN
+
 /* Host accessor macros (see README) */
 #define LIBXSVF_HOST_SETUP() h->setup(h)
 #define LIBXSVF_HOST_SHUTDOWN() h->shutdown(h)
 #define LIBXSVF_HOST_UDELAY(_usecs, _tms, _num_tck) h->udelay(h, _usecs, _tms, _num_tck)
 #define LIBXSVF_HOST_GETBYTE() h->getbyte(h)
-#define LIBXSVF_HOST_SYNC() (h->sync ? h->sync(h) : 0)
+#define LIBXSVF_HOST_SYNC() (/*h->sync ? h->sync(h) :*/ 0)
 #define LIBXSVF_HOST_PULSE_TCK(_tms, _tdi, _tdo, _rmask, _sync) h->pulse_tck(h, _tms, _tdi, _tdo, _rmask, _sync)
 #define LIBXSVF_HOST_PULSE_SCK() do { if (h->pulse_sck) h->pulse_sck(h); } while (0)
 #define LIBXSVF_HOST_SET_TRST(_v) do { if (h->set_trst) h->set_trst(h, _v); } while (0)
-#define LIBXSVF_HOST_SET_FREQUENCY(_v) (h->set_frequency ? h->set_frequency(h, _v) : -1)
-#define LIBXSVF_HOST_REPORT_TAPSTATE() do { if (h->report_tapstate) h->report_tapstate(h); } while (0)
-#define LIBXSVF_HOST_REPORT_DEVICE(_v) do { if (h->report_device) h->report_device(h, _v); } while (0)
-#define LIBXSVF_HOST_REPORT_STATUS(_msg) do { if (h->report_status) h->report_status(h, _msg); } while (0)
+#define LIBXSVF_HOST_SET_FREQUENCY(_v) (/*h->set_frequency ? h->set_frequency(h, _v) :*/ -1)
+#define LIBXSVF_HOST_REPORT_TAPSTATE() do { /*if (h->report_tapstate) h->report_tapstate(h);*/ } while (0)
+#define LIBXSVF_HOST_REPORT_DEVICE(_v) do { /*if (h->report_device) h->report_device(h, _v);*/ } while (0)
+#define LIBXSVF_HOST_REPORT_STATUS(_msg) do { /*if (h->report_status) h->report_status(h, _msg);*/ } while (0)
 #define LIBXSVF_HOST_REPORT_ERROR(_msg) h->report_error(h, __FILE__, __LINE__, _msg)
 #define LIBXSVF_HOST_REALLOC(_ptr, _size, _which) h->realloc(h, _ptr, _size, _which)
 
