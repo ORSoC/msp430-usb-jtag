@@ -166,6 +166,7 @@ __interrupt VOID iUsbInterruptHandler(VOID)
     case USBVECINT_INPUT_ENDPOINT4:
       break;
     case USBVECINT_INPUT_ENDPOINT5:
+      bWakeUp = CdcToHostFromBuffer(CDC0_INTFNUM);
       break;
     case USBVECINT_INPUT_ENDPOINT6:
       break;
@@ -206,6 +207,19 @@ __interrupt VOID iUsbInterruptHandler(VOID)
       } 
       break;
     case USBVECINT_OUTPUT_ENDPOINT5:
+      //call callback function if no receive operation is underway
+      if (!CdcIsReceiveInProgress(CDC0_INTFNUM) && USBCDC_bytesInUSBBuffer(CDC0_INTFNUM))
+      {
+          if (wUsbEventMask & kUSB_dataReceivedEvent)
+          {
+              bWakeUp = USBCDC_handleDataReceived(CDC0_INTFNUM);
+          }
+      }
+      else
+      {
+          //complete receive opereation - copy data to user buffer
+          bWakeUp = CdcToBufferFromHost(CDC0_INTFNUM);
+      }
       break;
     case USBVECINT_OUTPUT_ENDPOINT6:
       break;

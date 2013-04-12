@@ -46,6 +46,7 @@ extern "C"
 //***********************************************************************************************
 // CDC or HID - Define both for composite support
 //***********************************************************************************************
+#define _CDC_          // Needed for CDC interface
 #define _HID_          // Needed for HID interface
 //***********************************************************************************************
 // CONFIGURATION CONSTANTS
@@ -73,14 +74,14 @@ extern "C"
 // If a serial number is to be reported, set this to the index within the string descriptor
 //of the dummy serial number string.  It will then be automatically handled by the API.
 // If no serial number is to be reported, set this to 0.
-#define USB_STR_INDEX_SERNUM  3             
- #define PHDC_ENDPOINTS_NUMBER               2  // bulk in, bulk out
+#define USB_STR_INDEX_SERNUM  3
 
 /* We do not use HID, so need no report descriptors. Nor have we activated CDC yet. */
-#define DESCRIPTOR_TOTAL_LENGTH             (SIZEOF_CONFIG_DESCRIPTOR+2*(SIZEOF_INTERFACE_DESCRIPTOR+ \
-								       2*SIZEOF_ENDPOINT_DESCRIPTOR))
+#define DESCRIPTOR_TOTAL_LENGTH             (SIZEOF_CONFIG_DESCRIPTOR+	\
+					     2*(SIZEOF_INTERFACE_DESCRIPTOR+2*SIZEOF_ENDPOINT_DESCRIPTOR)+ /* ftdi */ \
+					     SIZEOF_CDC_INTERFACE_DESCRIPTOR)
 	// wTotalLength, This is the sum of configuration descriptor length  + CDC descriptor length  + HID descriptor length
-#define USB_NUM_INTERFACES                  2    // Number of implemented interfaces.
+#define USB_NUM_INTERFACES                  4    // Number of implemented interfaces.
 
 /* We have modified the HID stack to support use for FTDI style bulk channels */
 #define HID0_REPORT_INTERFACE              0              // Report interface number of HID0
@@ -91,23 +92,30 @@ extern "C"
 #define HID1_OUTEP_ADDR                    0x04           // Output Endpoint number of HID1
 #define HID1_INEP_ADDR                     0x83           // Input Endpoint number of HID1
 
-#define CDC_NUM_INTERFACES                   0           //  Total Number of CDCs implemented. should set to 0 if there are no CDCs implemented.
+#define CDC0_COMM_INTERFACE                2              // Comm interface number of CDC0
+#define CDC0_DATA_INTERFACE                3              // Data interface number of CDC0
+#define CDC0_INTEP_ADDR                    0x84           // Interrupt Endpoint Address of CDC0
+#define CDC0_OUTEP_ADDR                    0x05           // Output Endpoint Address of CDC0
+#define CDC0_INEP_ADDR                     0x85           // Input Endpoint Address of CDC0
+
+#define CDC_NUM_INTERFACES                   1           //  Total Number of CDCs implemented. should set to 0 if there are no CDCs implemented.
 #define HID_NUM_INTERFACES                   2           //  Total Number of HIDs implemented. should set to 0 if there are no HIDs implemented.
 #define MSC_NUM_INTERFACES                   0           //  Total Number of MSCs implemented. should set to 0 if there are no MSCs implemented.
 #define PHDC_NUM_INTERFACES                  0           //  Total Number of PHDCs implemented. should set to 0 if there are no PHDCs implemented.
 // Interface numbers for the implemented CDSs and HIDs, This is to use in the Application(main.c) and in the interupt file(UsbIsr.c).
 #define HID0_INTFNUM                HID0_REPORT_INTERFACE
 #define FLASH_INTFNUM		    HID1_REPORT_INTERFACE
+#define CDC0_INTFNUM                CDC0_COMM_INTERFACE
 #define MSC_MAX_LUN_NUMBER                   1           // Maximum number of LUNs supported
 
 #define PUTWORD(x)      ((x)&0xFF),((x)>>8)
 
-#define USB_OUTEP_INT_EN BIT0 | BIT2 | BIT4
-#define USB_INEP_INT_EN BIT0 | BIT1 | BIT3
+#define USB_OUTEP_INT_EN BIT0 | BIT2 | BIT4 | BIT5
+#define USB_INEP_INT_EN BIT0 | BIT1 | BIT3 | BIT4 | BIT5
 // MCLK frequency of MCU, in Hz
 // For running higher frequencies the Vcore voltage adjustment may required.
 // Please refer to Data Sheet of the MSP430 device you use
-#define USB_MCLK_FREQ 16000000                // MCLK frequency of MCU, in Hz
+#define USB_MCLK_FREQ 24000000                // MCLK frequency of MCU, in Hz
 #define USB_PLL_XT        2                  // Defines which XT is used by the PLL (1=XT1, 2=XT2)
 #if ORDB3A
 #define USB_XT_FREQ_VALUE 24.0
@@ -184,6 +192,15 @@ struct abromConfigurationDescriptorGenric
 /************************************************CDC Descriptor**************************/
 struct abromConfigurationDescriptorCdc
 {
+//Interface Association Descriptor
+    BYTE bLength;                             // Size of this Descriptor in Bytes
+    BYTE bDescriptorType;                     // Descriptor Type (=11)
+    BYTE bFirstInterface;                     // Interface number of the first one associated with this function
+    BYTE bInterfaceCount;                     // Numver of contiguous interface associated with this function
+    BYTE bFunctionClass;                      // The class triad of this interface,
+    BYTE bFunctionSubClass;                   // usually same as the triad of the first interface
+    BYTE bFunctionProcotol;
+    BYTE iInterface;                          // Index of String Desc for this function
 // interface descriptor (9 bytes)
     BYTE blength_intf;	                      // blength: interface descriptor size
     BYTE desc_type_interface;	              // bdescriptortype: interface
@@ -259,6 +276,7 @@ struct abromConfigurationDescriptorCdc
     BYTE inep_wmaxpacketsize2;  		      // wmaxpacketsize, 64 bytes
     BYTE inep_binterval;	                  // binterval: ignored for bulk transfer
 }	;
+#define SIZEOF_CDC_INTERFACE_DESCRIPTOR (sizeof(struct abromConfigurationDescriptorCdc))
 
 /**************************************HID descriptor structure *************************/
 struct abromConfigurationDescriptorHid
@@ -348,13 +366,13 @@ struct  abromConfigurationDescriptorGroup
     /* MSC descriptor structure */
     const struct abromConfigurationDescriptorMsc stMsc[MSC_NUM_INTERFACES];
 #endif
-#ifdef _CDC_ 
-    /* CDC descriptor structure */
-    const struct abromConfigurationDescriptorCdc stCdc[CDC_NUM_INTERFACES];
-#endif
 #ifdef _HID_
     /* HID descriptor structure */
     const struct abromConfigurationDescriptorHid stHid[HID_NUM_INTERFACES];
+#endif
+#ifdef _CDC_ 
+    /* CDC descriptor structure */
+    const struct abromConfigurationDescriptorCdc stCdc[CDC_NUM_INTERFACES];
 #endif
 #ifdef _PHDC_
 /* PDC descriptor structure */
