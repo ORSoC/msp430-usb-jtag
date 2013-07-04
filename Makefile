@@ -16,8 +16,12 @@ all: main ordb3a_firmware
 clean:
 	-rm main ordb3a_firmware $(USBOBJS) libusb.a $(USBFWOBJS)
 
-program: ordb3a_firmware
+prog-hid: ordb3a_firmware
 	PYTHONPATH=~/msp430/python-msp430-tools python -m msp430.bsl5.hid -B -e -P $<
+
+prog-debug: ordb3a_firmware.golden
+	LD_LIBRARY_PATH=/home/yann/msp430/MSP430.DLLv3_OS_Package	\
+			mspdebug tilib -d /dev/ttyACM0 prog $<
 
 main: main.o tps65217.o swi2cmst.o
 
