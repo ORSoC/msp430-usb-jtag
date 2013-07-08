@@ -52,6 +52,7 @@
 #include "F5xx_F6xx_Core_Lib/HAL_PMM.h"
 
 #include "USB_API/USB_HID_API/UsbHid.h"
+#include "USB_API/USB_CDC_API/UsbCdc.h"
 
 #include "usbConstructs.h"
 
@@ -59,6 +60,7 @@
 #include "jtag.h"
 #include "safesleep.h"
 #include "nand_ordb3.h"
+#include "uart.h"
 
 extern unsigned int boardInit(void);
 
@@ -94,12 +96,13 @@ int main (VOID)
 
     USB_init();                                 //init USB
     Init_TimerA1();
+    init_uart();
 
     //Enable various USB event handling routines
     USB_setEnabledEvents(
         kUSB_VbusOnEvent + kUSB_VbusOffEvent + kUSB_receiveCompletedEvent
         + kUSB_dataReceivedEvent + kUSB_UsbSuspendEvent + kUSB_UsbResumeEvent +
-        kUSB_UsbResetEvent);
+        kUSB_UsbResetEvent + kUSB_sendCompletedEvent);
 
     //See if we're already attached physically to USB, and if so, connect to it
     //Normally applications don't invoke the event handlers, but this is an exception.
@@ -130,12 +133,12 @@ int main (VOID)
                 if (bHIDDataReceived_event){                                        //Some data is in the buffer; begin receiving a
                                                                                     //command
 		    int i, o, len;
-                    char pieceOfString[MAX_STR_LENGTH] = "";                        //Holds the new addition to the string
+                    unsigned char pieceOfString[MAX_STR_LENGTH] = "";                        //Holds the new addition to the string
                     bHIDDataReceived_event = FALSE;  // Must be before receive
 
 		    do {
 
-			    len=hidReceiveDataInBuffer((BYTE*)pieceOfString,
+			    len=hidReceiveDataInBuffer(pieceOfString,
 						       MAX_STR_LENGTH,
 						       HID0_INTFNUM);               //Get the next piece of the string
 
@@ -145,7 +148,7 @@ int main (VOID)
 				    Reset_TimerA1();   // No need, the new version will only send if USB has buffer free
 				    // However, either of these will do partial sends happily so we're
 				    // not sending at optimal bitrate. 
-				    hidSendDataWaitTilDone((BYTE*)pieceOfString,o,HID0_INTFNUM,0);
+				    hidSendDataWaitTilDone(pieceOfString,o,HID0_INTFNUM,0);
 			    }
 		    } while (len);
                 }
@@ -212,7 +215,19 @@ int main (VOID)
 			stay_awake();  /* Waiting for NAND, don't sleep */
 		}
 
+		handle_uart();
+
 		if (bTimerTripped_event) {  // Be sure to send status bytes now and then (16ms)
+#if 0
+			static unsigned char cdc_data_buf[4]="00\r\n";
+			unsigned char fill=USBCDC_bytesInUSBBuffer(CDC0_INTFNUM);
+			cdc_data_buf[1]=(fill&0x0f) + '0';
+			cdc_data_buf[0]=(fill>>4) + '0';
+			if (cdc_data_buf[1] > '9') cdc_data_buf[1] += 'a'-'0';
+			if (cdc_data_buf[0] > '9') cdc_data_buf[0] += 'a'-'0';
+			USBCDC_sendData(cdc_data_buf, sizeof cdc_data_buf, CDC0_INTFNUM); // Worked!
+#endif
+
 			bTimerTripped_event = FALSE;
 			/* We don't care if this send fails, because that can only mean it wasn't needed
 			   (data already on its way, or USB disconnected) */

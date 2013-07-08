@@ -158,10 +158,11 @@ BYTE USBCDC_handleDataReceived (BYTE intfNum)
 {
     //TO DO: You can place your code here
 
-    return (FALSE);                             //return FALSE to go asleep after interrupt (in the case the CPU slept before
+    return (TRUE);                             //return FALSE to go asleep after interrupt (in the case the CPU slept before
                                                 //interrupt)
 }
 
+#if 0
 /*
  * This event indicates that a send operation on interface intfNum has just been completed.
  * returns TRUE to keep CPU awake
@@ -170,9 +171,10 @@ BYTE USBCDC_handleSendCompleted (BYTE intfNum)
 {
     //TO DO: You can place your code here
 
-    return (FALSE);                             //return FALSE to go asleep after interrupt (in the case the CPU slept before
+    return (TRUE);                             //return FALSE to go asleep after interrupt (in the case the CPU slept before
                                                 //interrupt)
 }
+#endif
 
 /*
  * This event indicates that a receive operation on interface intfNum has just been completed.
