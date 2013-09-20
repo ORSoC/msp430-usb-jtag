@@ -13,6 +13,9 @@
 #include <msp430.h>
 
 static struct uart_state {
+	// Not quite ring buffers. ?xsiz indicate fill level of buffers,
+	// ?xo indicate consumed data level. 
+	// Probably should convert to ring buffer behaviour.
 	unsigned char rxbuf[64], txbuf[64];
 	unsigned char rxsiz, txsiz;
 	unsigned char rxo, txo;
@@ -25,12 +28,40 @@ static struct uart_state {
  */
 BYTE USBCDC_handleSendCompleted (BYTE intfNum)
 {
-    //TO DO: You can place your code here
 	state.sending=0;
-    return (TRUE);                             //return FALSE to go asleep after interrupt (in the case the CPU slept before
-                                                //interrupt)
+	return (TRUE);   // Wake up
 }
 
+#pragma vector=USCI_A1_VECTOR
+__interrupt void USCI_A1_ISR (void)
+{
+	// Handle UART transfers
+	switch (UCA1IV) {
+	case 2: // Data received, store it in buffer
+		if (state.rxsiz < sizeof state.rxbuf)
+			state.rxbuf[state.rxsiz++] = UCA1RXBUF;
+		if (state.rxsiz==sizeof state.rxbuf) {
+			// Ran out of space, stop interrupt
+			UCA1IE &= ~UCRXIE;
+		}
+		// Wake up!
+		WAKEUP_IRQ(LPM3_bits);
+		break;
+	case 4: // Tx ready, send more from buffer
+		if (state.txo<state.txsiz) {
+			UCA1TXBUF = state.txbuf[state.txo++];
+		}
+		if (state.txo==state.txsiz) {
+			state.txo=0;
+			state.txsiz=0;
+			// Sent all available data, stop interrupt
+			UCA1IE &= ~UCTXIE;
+			// Wake up in case USB layer has more data
+			WAKEUP_IRQ(LPM3_bits);
+		}
+		break;
+	}
+}
 
 void init_uart(void) {
 	unsigned char p4_6_map = PM_UCA1TXD;
@@ -43,6 +74,7 @@ void init_uart(void) {
 	// when not using any modulation. start with that for now. 
 	// Comparable baud rate setting from SLAU208:
 	// 12MHz 115200baud UCOS16=1 UCBR=6 UCBRS=0 UCBRF=8  (???)
+	// We may get best results using 57600 settings
 	UCA1BRW = ((BRCLK_FREQ+UART_BAUD/2)/UART_BAUD)/16;   // oversampling mode
 	UCA1MCTL= 0;  // TODO: figure out how modulation really affects things and choose a modulated baud rate
 	UCA1STAT= UCLISTEN;   // Loopback mode for initial testing
@@ -63,49 +95,34 @@ void init_uart(void) {
 	state.txo=0;
 	state.rxo=0;
 	state.sending=0;
+
+	UCA1IE = UCRXIE;   // enable rx interrupt
 }
 
 void handle_uart(void) {
-	stay_awake();   // Temporary: until UART wakes main thread up. 
+	// Mark this whole function as a critical region; it interacts only with 
+	// uart and usb interrupts. 
+	// TODO: make this whole routine redundant by guaranteeing that the relevant
+	// interrupts are called. 
+	unsigned short bGIE  = (__get_SR_register() & GIE);
+	__disable_interrupt();
+
 	// receive tx chars from usb
 	if (state.txsiz<sizeof state.txbuf) {
+		// Main time waster
 		state.txsiz+=cdcReceiveDataInBuffer(state.txbuf+state.txsiz,
 						    sizeof state.txbuf-state.txsiz,
 						    CDC0_INTFNUM);
+		if (state.txsiz>state.txo)
+			UCA1IE |= UCTXIE;
+		else {
+			state.txsiz=0;
+			state.txo=0;
+		}
 		// Debug: USBCDC_sendData(state.txbuf, state.txsiz, CDC0_INTFNUM);
 	}
-	// transmit a tx char to uart
-	if (state.txo<state.txsiz) {
-#if 1
-		if (UCA1IFG&UCTXIFG) {   // uart ready
-			UCA1TXBUF = state.txbuf[state.txo++];
-			if (state.txo==state.txsiz) {
-				state.txo=0;
-				state.txsiz=0;
-			}
-		} else {  // want to send, but uart busy (TODO: interrupt)
-			stay_awake();
-		}
-#else
-		if (state.rxsiz<sizeof state.rxbuf) {
-			// Software loopback (strictly for testing)
-			state.rxbuf[state.rxsiz++] = state.txbuf[state.txo++];;
-			if (state.txo==state.txsiz) {
-				state.txo=0;
-				state.txsiz=0;
-			}
-		} else {  // want to send, but uart busy (TODO: interrupt)
-			stay_awake();
-		}
-#endif
-	}
-	// Receive chars from uart - TODO: wakeup
-	if (UCA1IFG&UCRXIFG) {
-		if (state.rxsiz<sizeof state.rxbuf) {
-			state.rxbuf[state.rxsiz++] = UCA1RXBUF;
-		}
-	}
-	// Pass chars to USB
+
+	// Pass rx chars to USB
 	if (state.rxsiz>state.rxo) {
 		char result, len=state.rxsiz-state.rxo;
 		state.sending=1;
@@ -127,15 +144,13 @@ void handle_uart(void) {
 		default:
 			/* Data not submitted, no effect to care about */;
 		}
-	} else if (state.rxsiz) {
-		// All data has been submitted to USB, check if done
-		//WORD bytesSent, bytesReceived;
-		//BYTE ret = USBCDC_intfStatus(CDC0_INTFNUM,&bytesSent,&bytesReceived);
-		//if (!(ret & kUSBCDC_waitingForSend)) {
-		if (!state.sending) {
+	} else {
+		if (state.rxsiz==state.rxo && !state.sending) {
 			// last data transmitted, reset buffer
 			state.rxo=0;
 			state.rxsiz=0;
 		}
+		UCA1IE |= UCRXIE;
 	}
+	__bis_SR_register(bGIE);
 }
