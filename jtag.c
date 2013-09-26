@@ -10,7 +10,8 @@
    Suggest setting SMCLK to top speed (24MHz is readily available) */
 
 /* As per IEEE 1149.1:
-   TCK may pause indefinitely when 0
+   TCK: state shall not change while held 0
+        state may remain while held 1
    TMS is sampled at rising TCK and reads 1 if not driven
    TDI is sampled at rising TCK and reads 1 if not driven
    TDO changes only on falling TCK
@@ -73,7 +74,35 @@
    Bit 2 sets nCE
    Bit 1 sets TMS/nCONFIG
    Bit 0 sets TCK/DCLK
+
+   Per ixo-jtag/usb_jtag/trunk/device/cpld/jtag_logic.vhd oscillator clock is 24MHz,
+   so TCK frequency is no more than 12MHz. It goes low in bytes_clock_finish and high in 
+   bytes_clock_high_and_shift or bytes_keep_clock_high, or is set by bits_set_pins_from_data.
+   state itself moves to next_state on every cycle.
+   Byte states:
+     set_nRD_high -> bytes_get_tdo_set_tdi when bitcount[8:3]!=0 (got data byte to shift)
+                  -> bytes_set_bitcount when ioshifter[7]=1      (byte mode start, expect length)
+                  -> bits_set_pins_from_data otherwise           (bit mode)
+     bytes_get_tdo_set_tdi -> bytes_clock_high_and_shift
+     bytes_clock_high_and_shift -> bytes_keep_clock_high
+     bytes_keep_clock_high -> bytes_clock_finish
+     bytes_clock_finish -> bytes_get_tdo_set_tdi when more bits to shift
+                        -> wait_for_nTXE_low when reading TDO
+                        -> wait_for_nRXF_low otherwise (wait for another byte from host)
+   This means that implementation spends 4 cycles per bit, for an actual clock rate of 6MHz.
+   It's quite possible Altera's implementation is faster; 12MHz according to openocd. 
+   At any rate, this means the sequence is:
+     1: get_tdo_set_tdi, updates TDI and samples TDO
+     2: clock_high_and_shift, raises TCK and shifts ioshifter (right, LSB first)
+     3: keep_clock_high, TCK stays high
+     4: clock_finish, TCK goes low
+   This definitely leaves TCK idling low, outputs the first bit before raising TCK,
+   and samples before TCK rises. 
+   jtag_shift_bits matches this behaviour. 
+   We had issues with JTAG debugging of OpenRISC when running at 24MHz. Reducing to 12MHz.
  */
+
+#define USE_USCI 1
 
 void jtag_init() {
 	/* We need to fall back to GPIO for bit or TMS transfers */
@@ -96,15 +125,16 @@ void jtag_init() {
 #endif
 	/* Could perhaps enable a pullup on TDO in case nothing is connected. */
 
+#if USE_USCI
 	/* Set up USCI to do large data shifts */
 	UCB1CTL1 = UCSWRST;  // disable/reset for configuration
 	/* LSB first, 8-bit, master, 3-pin SPI */
 	UCB1CTL0 = UCCKPH | UCMST | UCMODE_0 | UCSYNC;
-	UCB1BRW = 1; /* maximum bit rate */
+	UCB1BRW = 2; /* bit rate = 24MHz/2 */
 	//UCB1STAT = 0;
 	UCB1IE = 0;
-	UCB1CTL1 = UCSSEL1 | UCSWRST; // keep in reset until used
-
+	UCB1CTL1 = UCSSEL1 | UCSWRST; // use ACLK, keep in reset until used
+#endif
 	usb_jtag_state.bytes_to_shift = 0;
 	usb_jtag_state.read = 0;
 }
@@ -151,6 +181,7 @@ uint8_t jtag_shift_bits(uint8_t tdi, uint8_t tms, uint8_t len) {
 	return tdo;
 }
 
+#if USE_USCI
 void jtag_spi_on(void) {
 	/* Enable SPI function */
 	UCB1CTL1 = UCSSEL1;  // releases reset
@@ -158,6 +189,10 @@ void jtag_spi_on(void) {
 }
 void jtag_spi_off(void) {
 	/* Disable SPI function */
+	uint8_t p4 = P4OUT;
+	p4 &= ~0b00001110;
+	p4 |= P4IN & 0b00001110;
+	P4OUT = p4;    // Update drive values to current levels
 	P4SEL &= ~0b00001110; // revert pins to GPIO
 	UCB1CTL1 = UCSSEL1 | UCSWRST;  // Halt SPI unit
 }
@@ -207,6 +242,7 @@ void jtag_shift_bytes_finish() {
 #endif
 	jtag_spi_off();
 }
+#endif // USE_USCI
 
 struct usbblaster_state /* {
 	//uint8_t *bytes_in, *bytes_out;
@@ -280,13 +316,18 @@ int usbblaster_process_buffer(uint8_t *buf, int len) {
 	while (i<len) {
 		uint8_t bts=usb_jtag_state.bytes_to_shift, ret;
 
-		if (bts==0) {  // bitbang / command byte
+#if USE_USCI
+		if (bts==0)
+#endif
+		{  // bitbang / command byte
 			ret=usbblaster_byte(buf[i++]);
 			if (usb_jtag_state.read &&
 			    !(usb_jtag_state.bytes_to_shift && !bts)) {
 				buf[o++]=ret;
 			}
-		} else {  // Byte shift mode, use the SPI with DMA
+		} 
+#if USE_USCI
+		else {  // Byte shift mode, use the SPI with DMA
 			ret=len-i>bts ? bts : len-i;  // Size of data that can be shifted directly
 			jtag_shift_bytes_start(buf+i, buf+o, ret);
 			jtag_shift_bytes_finish();
@@ -295,6 +336,7 @@ int usbblaster_process_buffer(uint8_t *buf, int len) {
 			i+=ret;
 			usb_jtag_state.bytes_to_shift-=ret;
 		}
+#endif
 	}
 
 	return o;
