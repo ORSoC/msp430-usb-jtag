@@ -74,9 +74,10 @@ void init_uart(void) {
 	// when not using any modulation. start with that for now. 
 	// Comparable baud rate setting from SLAU208:
 	// 12MHz 115200baud UCOS16=1 UCBR=6 UCBRS=0 UCBRF=8  (???)
+	// 12MHz 57600baud UCOS16=1 UCBR=13 UCBRS=0 UCBRF=0
 	// We may get best results using 57600 settings
-	UCA1BRW = ((BRCLK_FREQ+UART_BAUD/2)/UART_BAUD)/16;   // oversampling mode
-	UCA1MCTL= 0;  // TODO: figure out how modulation really affects things and choose a modulated baud rate
+	UCA1BRW = ((BRCLK_FREQ+UART_BAUD*8)/UART_BAUD)/16;   // oversampling mode
+	UCA1MCTL= UCOS16;  // Turns out modulation won't help at this combination
 	UCA1STAT= UCLISTEN;   // Loopback mode for initial testing
 	// ignore IR registers for now
 	UCA1IFG = /*UCTXIFG | UCRXIFG*/0; // TODO enable tx interrupt when data available
