@@ -67,7 +67,7 @@ static struct nandgeom {
 } geom;
 static int colbits, rowbits;
 
-static inline void nand_init(void) {
+/*static inline*/ void nand_open(void) {
 	P5OUT |= CEn_BIT;
 	P5DIR |= CEn_BIT;
 
@@ -81,12 +81,8 @@ static inline void nand_init(void) {
 	PJDIR |= WEn_BIT|WPn_BIT|ALE_BIT;
 	P5OUT &= ~(CLE_BIT|CEn_BIT);
 	P5DIR |= CLE_BIT|CEn_BIT;
-
-	nand_state.addr_bytes=0;
-	nand_state.writelen=0;
-	nand_state.readlen=0;
 }
-static inline void nand_close(void) {
+/*static inline*/ void nand_close(void) {
 	// Release, but keep pullup for R/Bn and CEn and pulldown for WPn
 	P1DIR = 0;
 	P5OUT |= CEn_BIT;
@@ -226,7 +222,11 @@ int nand_probe(char *buf, int size) {
 	if (size<4+1+32)
 		return 0;  /* Caller error */
 
-	nand_init();
+	nand_open();
+
+	nand_state.addr_bytes=0;
+	nand_state.writelen=0;
+	nand_state.readlen=0;
 
 	select_chip(0);
 	
@@ -384,7 +384,7 @@ static void nand_loadpage(uint32_t page, enum cache_mode mode) {
 }
 
 static int xsvf_setup(struct libxsvf_host *h) {
-	nand_init();
+	nand_open();
 
 	xsvf_nand_state.bytesleftinpage=geom.bytesperpage;
 	xsvf_nand_state.pageinblock=2;
@@ -475,6 +475,7 @@ const struct libxsvf_host xsvf_host={
 #endif
 
 void process_nandreq(void) {
+	nand_open();
 	nand_CLE(1);
 	nand_write_byte(nand_state.cmd);
 	nand_CLE(0);

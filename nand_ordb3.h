@@ -12,8 +12,13 @@ extern struct nandreq {
 } nand_state;
 
 /* Indicates that we're waiting for a new request. */
+void nand_close(void);
+
 static inline int expect_nandreq(void) {
-	return nand_state.addr_bytes==0 && nand_state.writelen==0 && nand_state.readlen==0;
+	int ret = nand_state.addr_bytes==0 && nand_state.writelen==0 && nand_state.readlen==0;
+	if (ret)
+		nand_close();
+	return ret;
 }
 /* Measure how much data we're waiting for from USB. */
 static inline int expect_nanddata(void) {
