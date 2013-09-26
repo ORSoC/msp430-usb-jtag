@@ -399,7 +399,7 @@ BYTE USB_enable ()
     USBKEYPID = 0x9628;                                                         //set KEY and PID to 0x9628 -> access to
                                                                                 //configuration registers enabled
 //    XT2_Start_Timeout(XT2DRIVE_3, 1000);
-    XT2_Start(XT2DRIVE_3);
+//    XT2_Start(XT2DRIVE_3);
     USBPLLDIVB = USB_XT_FREQ;                                                   //Settings desired frequency
 
     if (USB_PLL_XT == 2){
