@@ -288,21 +288,11 @@ VOID Init_Clock (VOID)
 
 	P5SEL |= BIT2 | BIT4;	// External oscillators, we do not need outputs
 
-	// Definitely got stuck here
-	// XT2 Bypass spins until the oscillator fault flag, 
-	// SFRIFG1 bit OFIFG (bit 1, value 2) stops getting set.
-	// However, at this point our oscillator sources are set as
-	// 0x555, XT2CLK? Weird, that line is below.
-	// Can I measure the clock?
-	// Okay, another run I see 0x0044, which is A=XT1, SM=DCOCLKDIV.
-	// Perhaps those are having trouble?
-	// Have a look in UCSCTL7 for oscillator fault flags... 0x0402
-	// Huh, that's not a possible value per the datasheet. Still, it shows XT1 fail.
-	// Why would XT1 fail? It is also fed by external oscillator.. though the 
-	// initial state does have that problem. 
-	// CTL6: d1cd max drive xt2, bypass xt2, xt2 on
-	//  max drive xt1, low freq, not bypassed, XCAP=3, SMCLK on, XT1 on
-	XT1_Bypass();   // Set up XT1, so it won't keep failing
+	// Default state is clock pins disabled, SM from DCOCLKDIV, REF from XT1
+	// That will fail as it runs the FLL but doesn't feed it a clock
+	//XT1_Bypass();   // Set up XT1, so it won't keep failing
+	// Alternative to not require XT1: reconfigure clock sources to internal
+	UCSCTL4 = SELA__REFOCLK | SELS__REFOCLK | SELM__REFOCLK;  // very slow
 	XT2_Bypass();   // Enable XT2 oscillator bypass
 	// All clocks based on XT2
 	UCSCTL4 = SELA__XT2CLK | SELS__XT2CLK | SELM__XT2CLK;
