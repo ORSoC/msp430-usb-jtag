@@ -269,30 +269,45 @@ VOID Init_Clock (VOID)
     //Initialization of clock module
     if (USB_PLL_XT == 2){
 #if OLIMEXINO_5510
-		#if defined (__MSP430F552x) || defined (__MSP430F550x)
-			P5SEL |= 0x0C;                                      //enable XT2 pins for F5529
-		#elif defined (__MSP430F563x_F663x)
-			P7SEL |= 0x0C;
-		#endif
-#elif ORDB3A
-			P5SEL |= BIT2;	// External oscillator, we do not need XT2OUT
-#else
-# error unknown board
+#if defined (__MSP430F552x) || defined (__MSP430F550x)
+	P5SEL |= 0x0C;                                      //enable XT2 pins for F5529
+#elif defined (__MSP430F563x_F663x)
+	P7SEL |= 0x0C;
 #endif
 
-        //use REFO for FLL and ACLK
-        UCSCTL3 = (UCSCTL3 & ~(SELREF_7)) | (SELREF__REFOCLK);
-        UCSCTL4 = (UCSCTL4 & ~(SELA_7)) | (SELA__REFOCLK);
-
-        //MCLK will be driven by the FLL (not by XT2), referenced to the REFO
-        Init_FLL_Settle(USB_MCLK_FREQ / 1000, USB_MCLK_FREQ / 32768);   //Start the FLL, at the freq indicated by the config
+	//use REFO for FLL and ACLK
+	UCSCTL3 = (UCSCTL3 & ~(SELREF_7)) | (SELREF__REFOCLK);
+	UCSCTL4 = (UCSCTL4 & ~(SELA_7)) | (SELA__REFOCLK);
+	
+	//MCLK will be driven by the FLL (not by XT2), referenced to the REFO
+	Init_FLL_Settle(USB_MCLK_FREQ / 1000, USB_MCLK_FREQ / 32768);   //Start the FLL, at the freq indicated by the config
                                                                         //constant USB_MCLK_FREQ
-#ifdef OLIMEXINO_5510
         XT2_Start(XT2DRIVE_0);                                          //Start the "USB crystal"
+
 #elif ORDB3A
-	XT2_Bypass();
+
+	P5SEL |= BIT2 | BIT4;	// External oscillators, we do not need outputs
+
+	// Definitely got stuck here
+	// XT2 Bypass spins until the oscillator fault flag, 
+	// SFRIFG1 bit OFIFG (bit 1, value 2) stops getting set.
+	// However, at this point our oscillator sources are set as
+	// 0x555, XT2CLK? Weird, that line is below.
+	// Can I measure the clock?
+	// Okay, another run I see 0x0044, which is A=XT1, SM=DCOCLKDIV.
+	// Perhaps those are having trouble?
+	// Have a look in UCSCTL7 for oscillator fault flags... 0x0402
+	// Huh, that's not a possible value per the datasheet. Still, it shows XT1 fail.
+	// Why would XT1 fail? It is also fed by external oscillator.. though the 
+	// initial state does have that problem. 
+	// CTL6: d1cd max drive xt2, bypass xt2, xt2 on
+	//  max drive xt1, low freq, not bypassed, XCAP=3, SMCLK on, XT1 on
+	XT1_Bypass();   // Set up XT1, so it won't keep failing
+	XT2_Bypass();   // Enable XT2 oscillator bypass
+	// All clocks based on XT2
+	UCSCTL4 = SELA__XT2CLK | SELS__XT2CLK | SELM__XT2CLK;
 #else
-#error What sort of clock?
+# error unknown board
 #endif
     } 
 	else {
