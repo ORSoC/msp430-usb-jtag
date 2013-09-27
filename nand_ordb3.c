@@ -534,6 +534,7 @@ extern volatile uint8_t bCommand;
 __interrupt void PORT1_ISR (void)
 {
 	if (P5DIR&CEn_BIT==0 && P5IN&CEn_BIT) {
+		// Could add ALE and CLE both high, which is invalid for NAND.
 		// That is not for the flash, read it
 		bCommand = P1IN | BIT7;  // Use bit 7 to indicate new command
 		// Wake main thread up

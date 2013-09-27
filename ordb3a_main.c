@@ -119,6 +119,8 @@ int main (VOID)
 	if (gotcommand & 0x80) {
 		bCommand = gotcommand & 0x7f;
 		// Handle command byte (7bit)
+		// Example thing to do: send I2C command to run power down sequence
+		// (Should reprogram power down sequence not to kill msp430 for wakeup)
 	}
         //Check the USB state and directly main loop accordingly
         switch (USB_connectionState())
