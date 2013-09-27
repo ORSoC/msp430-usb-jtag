@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <msp430.h>
 
+#include <safesleep.h>
+
 #include <nand_ordb3.h>
 
 #define LIBXSVF
@@ -509,5 +511,23 @@ int produce_nanddata(char *data, int len) {
 		nand_state.readlen-=len;
 	}
 	return len;
+}
+
+/*
+ * Port 1 interrupt vector
+ *
+ * Triggered by NAND D7 going high (edge sensitive).
+ * If CEn is also high, that indicates a command for the MSP430.
+ */
+extern volatile uint8_t bCommand;
+#pragma vector=PORT1_VECTOR
+__interrupt void PORT1_ISR (void)
+{
+	if (P5IN & CEn_BIT) {
+		// That is not for the flash, read it
+		bCommand = P1IN | 0x80;  // Use bit 7 to indicate new command
+		// Wake main thread up
+		WAKEUP_IRQ(LPM3_bits);
+	}
 }
 

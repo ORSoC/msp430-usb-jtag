@@ -73,7 +73,7 @@ static void inline Reset_TimerA1(void) {
 BYTE retInString (char* string);
 
 volatile BYTE bHIDDataReceived_event = FALSE;   //Indicates data has been received without an open rcv operation
-volatile BYTE bTimerTripped_event = FALSE;
+volatile BYTE bTimerTripped_event = FALSE, bCommand = 0;
 
 #define MAX_STR_LENGTH 64
 
@@ -114,6 +114,12 @@ int main (VOID)
     __enable_interrupt();                           //Enable interrupts globally
     while (1)
     {
+        // Check for commands from FPGA
+        uint8_t gotcommand = bCommand;
+	if (gotcommand & 0x80) {
+		bCommand = gotcommand & 0x7f;
+		// Handle command byte (7bit)
+	}
         //Check the USB state and directly main loop accordingly
         switch (USB_connectionState())
         {
@@ -440,3 +446,4 @@ __interrupt void TIMER1_A0_ISR (void)
 	WAKEUP_IRQ(LPM3_bits);
     	 __no_operation();                       // Required for debugger
 }
+
