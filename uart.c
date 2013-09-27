@@ -64,7 +64,6 @@ __interrupt void USCI_A1_ISR (void)
 }
 
 void init_uart(void) {
-	unsigned char p4_6_map = PM_UCA1TXD;
 	// Set USCI_A1 to 115200 8N1
 	UCA1CTL1 |= UCSWRST;
 	UCA1CTL0 = UCMODE_0;  // 8N1 uart mode
@@ -78,18 +77,22 @@ void init_uart(void) {
 	// We may get best results using 57600 settings
 	UCA1BRW = ((BRCLK_FREQ+UART_BAUD*8)/UART_BAUD)/16;   // oversampling mode
 	UCA1MCTL= UCOS16;  // Turns out modulation won't help at this combination
-	UCA1STAT= UCLISTEN;   // Loopback mode for initial testing
+	//UCA1STAT= UCLISTEN;   // Loopback mode for initial testing
 	// ignore IR registers for now
 	UCA1IFG = /*UCTXIFG | UCRXIFG*/0; // TODO enable tx interrupt when data available
 	UCA1CTL1 &=~UCSWRST;
 
 	// Enable USCI_A1 UART pin functions
 	// P4.4 = PM_UCA1TXD, P4.5 = PM_UCA1RXD
+	// Not! Turns out they are swapped in the FPGA. Luckily we can easily swap too.
+	const uint8_t p4_45_map[2] = {PM_UCA1RXD, PM_UCA1TXD};
+	configure_ports(&p4_45_map, &P4MAP4, sizeof p4_45_map, 1);
 	P4SEL |= BIT4 | BIT5;
 
 	/* Debug: Make P4.6 another TX pin for oscilloscope using port mapper pmap */
-	configure_ports(&p4_6_map, &P4MAP6, 1, 1);
-	P4SEL |= BIT6;
+	//unsigned char p4_6_map = PM_UCA1TXD;
+	//configure_ports(&p4_6_map, &P4MAP6, 1, 1);
+	//P4SEL |= BIT6;
 
 	state.rxsiz=0;
 	state.txsiz=0;
