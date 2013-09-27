@@ -73,6 +73,10 @@ static int colbits, rowbits;
 	P5OUT |= CEn_BIT;
 	P5DIR |= CEn_BIT;
 
+	// Disable FPGA->MSP command path
+	P1IE = 0;
+	P1IFG = 0;
+
 	P1DIR = 0;
 	P1REN = 0;
 	P6OUT |= REn_BIT;
@@ -94,6 +98,11 @@ static int colbits, rowbits;
 	PJOUT &= ~WPn_BIT;
 	PJREN |= WPn_BIT;
 	PJDIR &= ~(WEn_BIT|WPn_BIT|ALE_BIT);
+
+	// Enable FPGA->MSP command path
+	P1IES = 0;
+	P1IFG = 0;
+	P1IE = BIT7;
 }
 
 static inline void nand_enable_write(void) {
@@ -229,6 +238,7 @@ int nand_probe(char *buf, int size) {
 	nand_state.addr_bytes=0;
 	nand_state.writelen=0;
 	nand_state.readlen=0;
+
 
 	select_chip(0);
 	
@@ -523,9 +533,9 @@ extern volatile uint8_t bCommand;
 #pragma vector=PORT1_VECTOR
 __interrupt void PORT1_ISR (void)
 {
-	if (P5IN & CEn_BIT) {
+	if (P5DIR&CEn_BIT==0 && P5IN&CEn_BIT) {
 		// That is not for the flash, read it
-		bCommand = P1IN | 0x80;  // Use bit 7 to indicate new command
+		bCommand = P1IN | BIT7;  // Use bit 7 to indicate new command
 		// Wake main thread up
 		WAKEUP_IRQ(LPM3_bits);
 	}
