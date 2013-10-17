@@ -533,6 +533,7 @@ extern volatile uint8_t bCommand;
 #pragma vector=PORT1_VECTOR
 __interrupt void PORT1_ISR (void)
 {
+	uint16_t iv = P1IV;  // Read interrupt vector register to clear IFG
 	if (P5DIR&CEn_BIT==0 && P5IN&CEn_BIT) {
 		// Could add ALE and CLE both high, which is invalid for NAND.
 		// That is not for the flash, read it
