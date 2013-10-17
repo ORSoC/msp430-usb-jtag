@@ -135,6 +135,7 @@ int main (VOID)
                 break;
 
             case ST_ENUM_ACTIVE:
+		    set_sleep_mode(0);
 		    enter_sleep();
 
                                                                                     //Exit LPM on USB receive and perform a receive
