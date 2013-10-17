@@ -164,6 +164,6 @@ void uart_inject(unsigned char ch) {
 	unsigned short bGIE  = (__get_SR_register() & GIE);
 	__disable_interrupt();
 	if (state.rxsiz < sizeof state.rxbuf)
-		state.rxbuf[state.rxsiz++] = UCA1RXBUF;
+		state.rxbuf[state.rxsiz++] = ch;
 	__bis_SR_register(bGIE);
 }
