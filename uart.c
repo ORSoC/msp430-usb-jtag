@@ -158,3 +158,12 @@ void handle_uart(void) {
 	}
 	__bis_SR_register(bGIE);
 }
+
+void uart_inject(unsigned char ch) {
+	// Used for diagnostic processing, sends things on USB.
+	unsigned short bGIE  = (__get_SR_register() & GIE);
+	__disable_interrupt();
+	if (state.rxsiz < sizeof state.rxbuf)
+		state.rxbuf[state.rxsiz++] = UCA1RXBUF;
+	__bis_SR_register(bGIE);
+}

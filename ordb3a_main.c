@@ -121,6 +121,7 @@ int main (VOID)
 		// Handle command byte (7bit)
 		// Example thing to do: send I2C command to run power down sequence
 		// (Should reprogram power down sequence not to kill msp430 for wakeup)
+		uart_inject(bCommand);
 	}
         //Check the USB state and directly main loop accordingly
         switch (USB_connectionState())
