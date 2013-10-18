@@ -19,7 +19,9 @@
 
 /* TODO: Figure out a safe way to select sleep mode from main thread.
    As it is, if exactly one event occurs, the next sleep will be based
-   on previous sleep mode. */
+   on previous sleep mode. 
+   Workaround: set_sleep_mode clears SR_sleep, ensuring another iteration.
+*/
 
 
 volatile unsigned char SR_sleep, SR_sleep_mode;
@@ -49,7 +51,7 @@ static inline void enter_sleep(void) {
 
 static inline void set_sleep_mode(uint8_t sleepmode) {
 	if (SR_sleep!=sleepmode)
-		SR_sleep=0;	// Make sure the next sleep isn't the wrong mode
+		stay_awake();	// Make sure the next sleep isn't the wrong mode
 	SR_sleep_mode = sleepmode;
 }
 
