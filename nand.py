@@ -141,12 +141,13 @@ class ONFI:
     def command(self, cmd, address="", outdata="", readlen=0):
         cmdbytes=struct.pack('<BBHH', cmd, len(address), len(outdata), readlen)
         towrite=cmdbytes+address
-        print "Writing command %r(%d) address %r(%d)"%(cmdbytes,len(cmdbytes),
-                                                       address,len(address))
-        self.conn.write(towrite)
-        written=0
-        outlen=len(outdata)
-        while written<len(outdata):
+        #print "Writing command %r(%d) address %r(%d)"%(cmdbytes,len(cmdbytes),
+        #                                               address,len(address))
+        self.conn.write(towrite+outdata)
+        if False:
+          written=0
+          outlen=len(outdata)
+          while written<len(outdata):
             towrite=outdata[written:written+64]
             print "Writing %d bytes: %r"%(len(towrite),towrite)
             print "Written %d bytes, %d left"%(written,len(outdata)-written)
@@ -154,7 +155,7 @@ class ONFI:
             written+=wrote
             (outlen,)=struct.unpack('<H',self.conn.read(2))
             print "Wrote %d more, FW expects %d more"%(wrote,outlen)
-        while outlen:
+          while outlen:
             (outlen,)=struct.unpack('<H',self.conn.read(2))
             print "Waited for FW to sync up (%d left)"%(outlen)
         return self.conn.read(readlen)
@@ -164,8 +165,9 @@ class ONFI:
         "Status register. 80=write enabled, 40=ready, 08=rewrite recommended, 02=cached error, 01=error"
         return ord(self.command(0x70, readlen=1))
     def programpage(self, page, data):
-        if not self.readstatus() & 0x80:
-            raise IOError("Tried to program read-only nand")
+        status=self.readstatus()
+        if not status & 0x80:
+            raise IOError("Tried to program read-only nand, status %#02x"%status)
         self.command(0x80,self.pagetoaddress(page),data)  # Load address and data
         self.command(0x10)  # program to flash
         return self.readstatus()

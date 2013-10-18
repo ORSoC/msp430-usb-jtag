@@ -32,3 +32,7 @@ extern void process_nandreq(void);
 extern void process_nanddata(char *data, int len);
 /* Read data from NAND to send over USB */
 extern int produce_nanddata(char *data, int maxlen);
+/* Program FPGA from NAND data */
+extern int program_fpga_from_nand(void);
+extern void nand_enable_write(void);
+extern void nand_disable_write(void);

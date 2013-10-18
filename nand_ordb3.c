@@ -81,8 +81,8 @@ static int colbits, rowbits;
 	P1REN = 0;
 	P6OUT |= REn_BIT;
 	P6DIR |= REn_BIT;
-	PJOUT |= WEn_BIT|R_Bn_BIT;
-	PJOUT &= ~(WPn_BIT|ALE_BIT);
+	PJOUT |= WEn_BIT|R_Bn_BIT|WPn_BIT;
+	PJOUT &= ~(/*WPn_BIT|*/ALE_BIT);
 	PJREN |= R_Bn_BIT;
 	PJDIR |= WEn_BIT|WPn_BIT|ALE_BIT;
 	P5OUT &= ~(CLE_BIT|CEn_BIT);
@@ -95,9 +95,9 @@ static int colbits, rowbits;
 	P5REN |= CEn_BIT;
 	P5DIR &= ~(CLE_BIT|CEn_BIT);
 	P6DIR &= ~REn_BIT;
-	PJOUT &= ~WPn_BIT;
-	PJREN |= WPn_BIT;
-	PJDIR &= ~(WEn_BIT|WPn_BIT|ALE_BIT);
+	//PJOUT &= ~WPn_BIT;
+	//PJREN |= WPn_BIT;
+	PJDIR &= ~(WEn_BIT/*|WPn_BIT*/|ALE_BIT);
 
 	// Enable FPGA->MSP command path
 	P1IES = 0;
@@ -105,11 +105,11 @@ static int colbits, rowbits;
 	P1IE = BIT7;
 }
 
-static inline void nand_enable_write(void) {
+inline void nand_enable_write(void) {
 	PJOUT |= WPn_BIT;
 }
-static inline void nand_disable_write(void) {
-	PJOUT &= ~WPn_BIT;
+inline void nand_disable_write(void) {
+	//PJOUT &= ~WPn_BIT;
 }
 
 static inline void nand_write_byte(char data) {
@@ -470,11 +470,16 @@ void *xsvf_realloc(struct libxsvf_host *h, void *ptr, int size, enum libxsvf_mem
 		}
 		sizes[which]=newptr?size:0;
 		return newptr;
-	} else
+	} else if (size==0) {
+		sizes[which]=0;
+		free(ptr);
+		return NULL;
+	} else  // We don't shrink buffers
 		return ptr;
 }
 
-const struct libxsvf_host xsvf_host={
+// Cannot be const, because it contains the TAP state
+struct libxsvf_host xsvf_host={
 	.setup=xsvf_setup,
 	.shutdown=xsvf_shutdown,
 	.udelay=xsvf_udelay,
@@ -483,6 +488,10 @@ const struct libxsvf_host xsvf_host={
 	.report_error=xsvf_report_error,
 	.realloc=xsvf_realloc,
 };
+
+int program_fpga_from_nand(void) {
+	return libxsvf_play(&xsvf_host, LIBXSVF_MODE_XSVF);
+}
 
 #endif
 
@@ -533,7 +542,7 @@ extern volatile uint8_t bCommand;
 #pragma vector=PORT1_VECTOR
 __interrupt void PORT1_ISR (void)
 {
-	uint16_t iv = P1IV;  // Read interrupt vector register to clear IFG
+	__attribute__((unused)) uint16_t iv = P1IV;  // Read interrupt vector register to clear IFG
 	if (!(P5DIR&CEn_BIT) && (P5IN&CEn_BIT)) {
 		// Could add ALE and CLE both high, which is invalid for NAND.
 		// That is not for the flash, read it
