@@ -60,9 +60,9 @@ struct nandreq nand_state;
 
 static struct nandgeom {
 	uint32_t bytesperpage;
-	uint32_t sparebytesperpage;
+	uint16_t sparebytesperpage;
 	uint32_t bytesperpartialpage;
-	uint32_t sparebytesperpartialpage;
+	uint16_t sparebytesperpartialpage;
 	uint32_t pagesperblock;
 	uint32_t blocksperlun;
 	uint8_t luns, addresscycles;
@@ -112,21 +112,21 @@ inline void nand_disable_write(void) {
 	//PJOUT &= ~WPn_BIT;
 }
 
-static inline void nand_write_byte(char data) {
+static inline void __attribute__((always_inline)) nand_write_byte(char data) {
 	P1OUT = data;
 	P1DIR = 0xff;
 	PJOUT &= ~WEn_BIT;
 	PJOUT |= WEn_BIT;
 }
 
-static inline void nand_ALE(int ale) {
+static inline void __attribute__((always_inline)) nand_ALE(int ale) {
 	if (ale)
 		PJOUT |= ALE_BIT;
 	else
 		PJOUT &= ~ALE_BIT;
 }
 
-static inline void nand_CLE(int cle) {
+static inline void __attribute__((always_inline)) nand_CLE(int cle) {
 	if (cle)
 		P5OUT |= CLE_BIT;
 	else
@@ -290,7 +290,8 @@ int nand_probe(char *buf, int size) {
 		ordb3_nand_read_buf(buf+4, 5);
 
 		if (!(buf[4]==0x2c && buf[5]==0xda)) {
-			// MT29F1G08ABADA is f1, MT29F2G08ABAEAH4 is da
+			// MT29F1G08ABADA is 2c f1, MT29F2G08ABAEAH4 is 2c da
+			// S34ML01G1 is 01 something, and appears to have no ECC function.
 			buf[4]='!';
 			break;  // Not the known chip, don't poke at vendor specific feature 
 		}
@@ -384,6 +385,8 @@ static void nand_loadpage(uint32_t page, enum cache_mode mode) {
 	for (i=geom.addresscycles&0x0f; i--; page>>=8)
 		nand_write_byte(page);
 	nand_ALE(0);
+	for (timeout=-1; timeout && !nand_ready(); --timeout)
+		;  // Wait until flash chip ready
 	nand_CLE(1);
 	nand_write_byte(mode);
 	nand_CLE(0);
@@ -391,6 +394,14 @@ static void nand_loadpage(uint32_t page, enum cache_mode mode) {
 	   Wait for R/Bn before reading data, and check status register
 	   for ECC failures. If cached, the previously fetched page is 
 	   readable currently. */
+	for (timeout=-1; timeout && !nand_ready(); --timeout)
+		;  // Wait until flash chip ready
+	nand_read_status(); // TODO: abort if status failed
+	for (timeout=-1; timeout && !nand_ready(); --timeout)
+		;  // Wait until flash chip ready
+	nand_CLE(1);
+	nand_write_byte(0x00);  // Ensure we switch to data read mode (not ONFI info)
+	nand_CLE(0);
 	for (timeout=-1; timeout && !nand_ready(); --timeout)
 		;  // Wait until flash chip ready
 }
