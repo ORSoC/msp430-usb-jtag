@@ -445,6 +445,7 @@ static void xsvf_udelay(struct libxsvf_host *h, long usecs, int tms, long num_tc
 
 static int xsvf_getbyte(struct libxsvf_host *h) {
 	if (!--xsvf_nand_state.bytesleftinpage) {
+		int byte=ordb3_nand_read_byte();
 		/* Need to start on a new page */
 		int bil=xsvf_nand_state.blockinlist;
 		nand_loadpage(xsvf_nand_state.blocks[bil]*geom.pagesperblock+
@@ -460,6 +461,7 @@ static int xsvf_getbyte(struct libxsvf_host *h) {
 				xsvf_nand_state.pageinblock--;  // Repeat last page
 			}
 		}
+		return byte;  // Last byte of previous page
 	}
 	return ordb3_nand_read_byte();
 }
