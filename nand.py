@@ -100,6 +100,9 @@ class ONFI:
                     return status
             else:
                 print "status not ready"
+    def readpage(self, page):
+        self.loadpage(page)
+        return self.datafrompage(size=self.bytesperpage)
     def datafrompage(self, start=0, size=None):
         if size is None:
             # Default to reading the rest of the page
@@ -274,15 +277,40 @@ def main(argv):
     if argv[1]=='badblocks':
         print "Bad blocks:", onfi.scanforbadblocks()
     if argv[1]=='read':
-        open(argv[2],'wb').write(readimage(onfi))
+        if len(argv)>3:  # read from specific page address
+            page=int(argv[3],0)
+            open(argv[2],'wb').write(onfi.readpage(page))
+        else:
+            open(argv[2],'wb').write(readimage(onfi))
     if argv[1]=='write':
-        blocks=writeimage(onfi,open(argv[2],'rb').read())
+        data=open(argv[2],'rb').read()
+        if len(argv)>3:  # Write to specific block address
+            # 32 for ordb3a boot code
+            block=int(argv[3],0)
+            if len(argv)>4 and argv[4]=='len':   # Patch in length for boot ROM
+                data=struct.pack('>I', len(data))+data[4:]
+            while data:
+                onfi.eraseblock(block)
+                for page in range(onfi.pagesperblock*block,
+                                  onfi.pagesperblock*(block+1)):
+                    onfi.programpagewithverify(page,data[:onfi.bytesperpage])
+                    data=data[onfi.bytesperpage:]
+                    if not data:
+                        break
+                block+=1
+        else:  # Write XSVF image with block list at 0, for MSP430 to configure FPGA
+            blocks=writeimage(onfi,data)
     if argv[1]=='rawread':
         for page in range(int(argv[2])):
             onfi.loadpage(page)
             print repr(onfi.datafrompage())
     if argv[1]=='erase':
         onfi.eraseblock(0)
+    if argv[1]=='info':
+        print "%d bytes per page, %d pages per block, %d total blocks"%(
+            onfi.bytesperpage, onfi.pagesperblock, onfi.totalpages/onfi.pagesperblock)
+        print "Address bytes: %d column %d row"%(
+            onfi.columnaddressbytes, onfi.rowaddressbytes)
 
 if __name__=='__main__':
     from sys import argv
