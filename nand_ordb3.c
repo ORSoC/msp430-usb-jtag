@@ -182,6 +182,22 @@ int nand_ready(void) {
 	return PJIN & R_Bn_BIT;
 }
 
+int wait_for_nand_ready(void) {
+	unsigned int timeout=0xffff;  // Only there to ensure completion
+	uint8_t status;
+	// Await NAND ready, using read status polling
+	nand_CLE(1);
+	nand_write_byte(0x70); // Read status
+	nand_CLE(0);
+	P1DIR=0;
+	do {
+		P6OUT &= ~REn_BIT;
+		status=P1IN;
+		P6OUT |= REn_BIT;
+	} while(((status&(1<<6))==0) && --timeout);
+	return timeout;  // non-0 if successful
+}
+
 /* Default function uses a command instead */
 static void select_chip(int chip) {
 	if (chip==0) {
@@ -197,35 +213,6 @@ char nand_read_status(void) {
 	nand_CLE(0);
 	return ordb3_nand_read_byte();
 }
-
-#if 0 /* Better to leave this to host? Firmware is not planned to write on its own. */
-int nand_erase_row(row_t row) {
-	long timeout;
-	int i;
-
-	for (timeout=-1; timeout && !nand_ready(); --timeout)
-		;  // Wait until flash chip ready
-	if (!nand_ready())
-		return 0;
-	nand_CLE(1);
-	nand_write_byte(0x60);
-	nand_CLE(0);
-	nand_ALE(1);
-	for (i=0; i<ROWBYTES; i++) {
-		nand_write_byte(row&0xff);
-		row>>=8;
-	}
-	nand_ALE(0);
-	nand_CLE(1);
-	nand_write_byte(0xd0);
-	nand_CLE(0);
-	for (timeout=-1; timeout && !nand_ready(); --timeout)
-		;  // Wait until flash chip ready
-	if (!nand_ready())
-		return 0;  // Timeout
-	return !(nand_read_status()&1);  // Fail not set
-}
-#endif
 
 int nand_probe(char *buf, int size) {
 	int tries=1+5, i, timeout;
@@ -370,23 +357,19 @@ struct xsvfnand_state {
 // perhaps we can break the loop.)
 enum cache_mode { Uncached=0x30, Cached=0x31, Last=0x3f };
 static void nand_loadpage(uint32_t page, enum cache_mode mode) {
-	long timeout;
 	/* Column address (byte in page) first, row address (page) second */
 	int i;
 
-	for (timeout=-1; timeout && !nand_ready(); --timeout)
-		;  // Wait until flash chip ready
+	wait_for_nand_ready();  // Note: still in read status after this!
 	nand_CLE(1);
 	nand_write_byte(0x00);  // Read mode
 	nand_CLE(0);
-	nand_ALE(1);
+	nand_ALE(1);		// Write new address
 	for (i=geom.addresscycles>>4; i--; )
 		nand_write_byte(0);
 	for (i=geom.addresscycles&0x0f; i--; page>>=8)
 		nand_write_byte(page);
 	nand_ALE(0);
-	for (timeout=-1; timeout && !nand_ready(); --timeout)
-		;  // Wait until flash chip ready
 	nand_CLE(1);
 	nand_write_byte(mode);
 	nand_CLE(0);
@@ -394,20 +377,19 @@ static void nand_loadpage(uint32_t page, enum cache_mode mode) {
 	   Wait for R/Bn before reading data, and check status register
 	   for ECC failures. If cached, the previously fetched page is 
 	   readable currently. */
-	for (timeout=-1; timeout && !nand_ready(); --timeout)
-		;  // Wait until flash chip ready
-	nand_read_status(); // TODO: abort if status failed
-	for (timeout=-1; timeout && !nand_ready(); --timeout)
-		;  // Wait until flash chip ready
+	wait_for_nand_ready();  // Note: still in read status after this!
 	nand_CLE(1);
-	nand_write_byte(0x00);  // Ensure we switch to data read mode (not ONFI info)
+	nand_write_byte(0x00);  // Ensure we switch to data read mode (not status)
 	nand_CLE(0);
-	for (timeout=-1; timeout && !nand_ready(); --timeout)
-		;  // Wait until flash chip ready
 }
 
 static int xsvf_setup(struct libxsvf_host *h) {
 	nand_open();
+
+	// XSVF programming may cause FPGA to start reading NAND, 
+	// so we keep the busy line asserted while we need the NAND
+	PJOUT &= ~R_Bn_BIT;
+	PJDIR |= R_Bn_BIT;
 
 	xsvf_nand_state.bytesleftinpage=geom.bytesperpage;
 	xsvf_nand_state.pageinblock=2;
@@ -434,11 +416,14 @@ static int xsvf_setup(struct libxsvf_host *h) {
 
 static int xsvf_shutdown(struct libxsvf_host *h) {
 	nand_close();
+	// Restore R/Bn to pullup
+	PJDIR &= ~R_Bn_BIT;
+	PJOUT |= R_Bn_BIT;
 	return 0;
 }
 
 static void xsvf_udelay(struct libxsvf_host *h, long usecs, int tms, long num_tck) {
-	while (num_tck) {
+	while (num_tck--) {
 		pulse_tck(h,tms,-1,-1,0,0);
 	}
 }
