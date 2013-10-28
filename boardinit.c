@@ -169,7 +169,7 @@ unsigned int boardInitOrdb3a(void)
 	/* Enable lines: FIXME use sequencer? */
 	/* Sequencer will power up all other rails, just turn on uC and VBUS */
 	SET_TPS_REG_PW2(TPS65217_ENABLE, 
-			TPS65217_ENABLE_LDO1_EN | TPS65217_ENABLE_LS2_EN | // MCU
+			TPS65217_ENABLE_LDO1_EN | // MCU
 			0x7f /* enable all */);
 	// USB should be possible from here
 
@@ -186,6 +186,38 @@ unsigned int boardInitOrdb3a(void)
 	} while (1);
 
 	return result;
+}
+
+void fpga_powerdown(void) {
+#ifndef USE_SEQUENCER
+	/* Simply shut everything off at once. Don't do this during flash programming. */
+	tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_ENABLE);
+	tps65217_wrReg(TPS65217_ENABLE, TPS65217_ENABLE_LDO1_EN);  // Keep MCU power
+#else
+	// Alternatively, we could use SEQ6 bits SEQUP and SEQDWN if sequencer was 
+	// set up nicely. The default setting turns on LS2 which we don't need, but 
+	// does leave LDO1 alone, so we could use it. 
+	tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_SEQ6);
+	tps65217_wrReg(TPS65217_SEQ6, TPS65217_SEQ6_SEQDWN);
+#endif	
+}
+
+void fpga_powerup(void) {
+#ifndef USE_SEQUENCER
+	/* Simply turn everything on at once. Don't do this during flash programming. */
+	tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_ENABLE);
+	tps65217_wrReg(TPS65217_ENABLE, 
+		       TPS65217_ENABLE_LDO1_EN |  // MCU power
+		       TPS65217_ENABLE_DC1_EN | // 1.5V power for DDR RAM
+		       TPS65217_ENABLE_DC2_EN | // Main 3.3V, including NAND and FPGA IO
+		       TPS65217_ENABLE_DC3_EN | // FPGA core
+		       TPS65217_ENABLE_LDO2_EN | // FPGA transceivers
+		       TPS65217_ENABLE_LS1_EN); // FPGA PLL power
+	// Not included: LS2, which is not used inside the module. 
+#else
+	tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_SEQ6);
+	tps65217_wrReg(TPS65217_SEQ6, TPS65217_SEQ6_SEQUP);
+#endif
 }
 #endif
 
