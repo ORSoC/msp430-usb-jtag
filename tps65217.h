@@ -61,6 +61,12 @@
 #define TPS65217A               0x7
 #define TPS65217B               0xF
 
+#define TPS65217_STATUS		0x0a
+#define TPS65217_STATUS_PB		0x01
+#define TPS65217_STATUS_USBPWR		0x04
+#define TPS65217_STATUS_ACPWR		0x08
+#define TPS65217_STATUS_OFF		0x80
+
 #define TPS65217_PASSWORD		0x0b
 #define TPS65217_PASSWORD_VALUE	0x7d
 

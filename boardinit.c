@@ -219,6 +219,12 @@ void fpga_powerup(void) {
 	tps65217_wrReg(TPS65217_SEQ6, TPS65217_SEQ6_SEQUP);
 #endif
 }
+
+int check_pushbutton(void) {
+	unsigned char statusReg = 0;
+	tps65217_rdReg(TPS65217_STATUS, &statusReg);
+	return statusReg & TPS65217_STATUS_PB;
+}
 #endif
 
 //----------------------------------------------------------------------------
