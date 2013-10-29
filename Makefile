@@ -11,10 +11,10 @@ LDFLAGS=-mmcu=$(MCU) -Os
 # TODO: autogenerate dependencies?
 .PHONY: all clean program
 
-all: main ordb3a_firmware
+all: bootstrapper ordb3a_firmware
 
 clean:
-	-rm main ordb3a_firmware $(USBOBJS) libusb.a $(USBFWOBJS)
+	-rm bootstrapper ordb3a_firmware $(USBOBJS) libusb.a $(USBFWOBJS)
 
 prog-hid: ordb3a_firmware
 	#-sudo usb_modeswitch -v 09fb -p 6001 -H -V 2047 -P 0200
@@ -24,9 +24,6 @@ prog-debug: ordb3a_firmware.golden
 	LD_LIBRARY_PATH=/home/yann/msp430/MSP430.DLLv3_OS_Package	\
 			mspdebug tilib -d /dev/ttyACM0 prog $<
 
-main: main.o tps65217.o swi2cmst.o
-
-main.o: main.c cfg.h defs.h tps65217.h
 
 swi2cmst.o: swi2cmst.c swi2cmst.h cfg.h
 
@@ -44,6 +41,7 @@ USBOBJS=\
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_PMM.o \
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_TLV.o \
 	usbConstructs.o usbEventHandling.o
+LIBXSVFOBJS=libxsvf/xsvf.o libxsvf/play.o libxsvf/tap.o
 USBFWOBJS=ordb3a_main.o jtag.o msp430-usb/USB_config/descriptors.o \
 	boardinit.o tps65217.o swi2cmst.o uart.o \
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_PMAP.o \
@@ -53,6 +51,15 @@ LDFLAGS += -Wl,--defsym=tSetupPacket=0x2380 -Wl,--defsym=tEndPoint0DescriptorBlo
 libusb.a: $(USBOBJS)
 	ar rsc $@ $^
 
-ordb3a_firmware: $(USBFWOBJS) libusb.a
+libxsvf.a: $(LIBXSVFOBJS)
+	ar rsc $@ $^
+
+ordb3a_firmware: $(USBFWOBJS) libusb.a libxsvf.a
 	$(CC) -o $@ $(LDFLAGS) $^ $(LOADLIBES) $(LDLIBS)
 
+## Don't! Cy5 module does expect cy5 board define #bootstrapper: BOARD=OLIMEXINO5510_ORSOC8695EP4GX
+bootstrapper: MCU=msp430f5510
+bootstrapper: main.c tps65217.c swi2cmst.c
+	$(CC) -o $@ -DLED_AVAIL -DBOOTSTRAP $(LDFLAGS) $(LOADLIBES) $(LDLIBS) $(CPPFLAGS) $(CFLAGS) $^
+
+#main.o: main.c cfg.h defs.h tps65217.h
