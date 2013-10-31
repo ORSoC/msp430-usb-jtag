@@ -63,6 +63,9 @@
 #include "uart.h"
 
 extern unsigned int boardInit(void);
+extern void fpga_powerdown(void);
+extern void fpga_powerup(void);
+extern int check_pushbutton(void);
 
 VOID Init_Ports (VOID);
 VOID Init_Clock (VOID);
@@ -86,13 +89,18 @@ unsigned int FastToggle_Period = 1000 - 1;
 extern void Do_NAND_Probe(void);
 int main (VOID)
 {
+	char fpga_powered=0;
     WDTCTL = WDTPW + WDTHOLD;                                   //Stop watchdog timer
 
     Init_Ports();                                               //Init ports (do first ports because clocks do change ports)
+    fpga_powered=1;
     SetVCore(3);	// Do this before accessing NAND but after talking to PM chip on I²C
     Init_Clock();                                               //Init clocks
 
     Do_NAND_Probe();	// Initializes NAND and enables ECC
+
+    // Configure FPGA
+    //program_fpga_from_nand();
 
     USB_init();                                 //init USB
     Init_TimerA1();
@@ -135,6 +143,10 @@ int main (VOID)
                 break;
 
             case ST_ENUM_ACTIVE:
+		    if (!fpga_powered) {
+			    fpga_powerup();
+			    fpga_powered=1;
+		    }
 		    set_sleep_mode(0);
 		    enter_sleep();
 
@@ -251,11 +263,17 @@ int main (VOID)
 
             case ST_ENUM_SUSPENDED:
                 LED_OFF;                                                     //When suspended, turn off LED
+		if (fpga_powered) {
+			fpga_powerdown();
+			fpga_powered=0;
+		}
 		set_sleep_mode(LPM0_bits);
 		enter_sleep();
                 break;
 
             case ST_ENUM_IN_PROGRESS:
+		    //fpga_powerup();
+		    //fpga_powered=1;
                 break;
 
             case ST_NOENUM_SUSPENDED:

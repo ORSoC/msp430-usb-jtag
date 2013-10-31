@@ -188,11 +188,14 @@ unsigned int boardInitOrdb3a(void)
 	return result;
 }
 
+#define USE_SEQUENCER
+
 void fpga_powerdown(void) {
 #ifndef USE_SEQUENCER
 	/* Simply shut everything off at once. Don't do this during flash programming. */
 	tps65217_wrReg(TPS65217_PASSWORD, TPS65217_PASSWORD_VALUE^TPS65217_ENABLE);
-	tps65217_wrReg(TPS65217_ENABLE, TPS65217_ENABLE_LDO1_EN);  // Keep MCU power
+	tps65217_wrReg(TPS65217_ENABLE, TPS65217_ENABLE_LDO1_EN //);  // Keep MCU power
+		       | TPS65217_ENABLE_DC2_EN); // Main 3.3V for debugging purposes
 #else
 	// Alternatively, we could use SEQ6 bits SEQUP and SEQDWN if sequencer was 
 	// set up nicely. The default setting turns on LS2 which we don't need, but 
