@@ -134,7 +134,8 @@
                         } while ( 0 )
 #define SWI2CMST_SDA_GET                                    \
 	                    (SWI2CMST_PINP & SWI2CMST_BSDA ? 1 : 0)
-#define SWI2CMST_DELAY  _NOP()
+//#define SWI2CMST_DELAY  _NOP()
+#define SWI2CMST_DELAY  __delay_cycles(50)
 
 
 #else

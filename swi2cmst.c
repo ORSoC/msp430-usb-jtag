@@ -73,23 +73,30 @@ void swi2cmst_start(void)
 {
 	SWI2CMST_SDA_HI;
 	SWI2CMST_SCL_HI;
+	SWI2CMST_DELAY;
 	SWI2CMST_SDA_LO;
+	SWI2CMST_DELAY;
 	SWI2CMST_SCL_LO;
+	SWI2CMST_DELAY;
 }
 
 void swi2cmst_stop(void)
 {
 	SWI2CMST_SDA_LO;
 	SWI2CMST_SCL_HI;
+	SWI2CMST_DELAY;
 	SWI2CMST_SDA_HI;
+	SWI2CMST_DELAY;
 }
 
 void swi2cmst_wrbit(unsigned char b)
 {
 	SWI2CMST_SDA_SET(b);
+	SWI2CMST_DELAY;
 	SWI2CMST_SCL_HI;
 	SWI2CMST_DELAY;
 	SWI2CMST_SCL_LO;
+	SWI2CMST_DELAY;
 }
 
 unsigned char swi2cmst_rdbit(void)
@@ -97,9 +104,10 @@ unsigned char swi2cmst_rdbit(void)
 	unsigned char b;
 
 	SWI2CMST_SCL_HI;
-	b = SWI2CMST_SDA_GET;
 	SWI2CMST_DELAY;
+	b = SWI2CMST_SDA_GET;
 	SWI2CMST_SCL_LO;
+	SWI2CMST_DELAY;
 	return b;
 }
 
