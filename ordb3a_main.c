@@ -100,7 +100,7 @@ int main (VOID)
     Do_NAND_Probe();	// Initializes NAND and enables ECC
 
     // Configure FPGA
-    //program_fpga_from_nand();
+    program_fpga_from_nand();
 
     USB_init();                                 //init USB
     Init_TimerA1();
