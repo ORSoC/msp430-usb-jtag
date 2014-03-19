@@ -41,7 +41,7 @@ USBOBJS=\
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_PMM.o \
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_TLV.o \
 	usbConstructs.o usbEventHandling.o
-LIBXSVFOBJS=libxsvf/xsvf.o libxsvf/play.o libxsvf/tap.o
+LIBXSVFOBJS=libxsvf/xsvf.o libxsvf/play.o libxsvf/tap.o libxsvf/svf.o libxsvf/scan.o
 USBFWOBJS=ordb3a_main.o jtag.o msp430-usb/USB_config/descriptors.o \
 	boardinit.o tps65217.o swi2cmst.o uart.o \
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_PMAP.o \
