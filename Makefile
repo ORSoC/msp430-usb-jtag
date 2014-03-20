@@ -14,7 +14,7 @@ LDFLAGS=-mmcu=$(MCU) -Os -g
 all: bootstrapper ordb3a_firmware
 
 clean:
-	-rm bootstrapper ordb3a_firmware $(USBOBJS) libusb.a $(USBFWOBJS)
+	-rm -f bootstrapper ordb3a_firmware $(USBOBJS) libusb.a $(USBFWOBJS) $(LIBXSVFOBJS) libxsvf.a
 
 prog-hid: ordb3a_firmware
 	#-sudo usb_modeswitch -v 09fb -p 6001 -H -V 2047 -P 0200
