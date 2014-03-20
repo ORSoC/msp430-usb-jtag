@@ -5,8 +5,8 @@ BOARD ?= ORDB3A
 MCU ?= msp430f5507
 
 CC=msp430-gcc
-CFLAGS=-mmcu=$(MCU) -Os -Wall
-LDFLAGS=-mmcu=$(MCU) -Os
+CFLAGS=-mmcu=$(MCU) -Os -Wall -g
+LDFLAGS=-mmcu=$(MCU) -Os -g
 
 # TODO: autogenerate dependencies?
 .PHONY: all clean program
