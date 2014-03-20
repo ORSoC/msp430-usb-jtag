@@ -26,3 +26,9 @@ TPS65217. A couple of reasons have been found:
 
 /Per
 
+
+Note: Depends on libxsvf for parsing XSVF files. This comes from an external
+repository. To download it's sources please run
+
+   git submodule update --init
+
