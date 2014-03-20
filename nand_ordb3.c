@@ -383,6 +383,8 @@ static void nand_loadpage(uint32_t page, enum cache_mode mode) {
 	nand_CLE(0);
 }
 
+static int xsvf_shutdown(struct libxsvf_host *h);
+
 static int xsvf_setup(struct libxsvf_host *h) {
 	nand_open();
 
@@ -402,8 +404,10 @@ static int xsvf_setup(struct libxsvf_host *h) {
 
 	/* Sanity check: first block is valid and not 0 */
 	if (xsvf_nand_state.blocks[0]<=0 ||
-	    xsvf_nand_state.blocks[0]>=geom.blocksperlun*geom.luns)
+	    xsvf_nand_state.blocks[0]>=geom.blocksperlun*geom.luns) {
+		xsvf_shutdown(h);
 		return -1;
+	}
 
 	/* Start loading first page */
 	nand_loadpage(xsvf_nand_state.blocks[0]*geom.pagesperblock,Cached);
