@@ -31,7 +31,8 @@ tps65217.o: tps65217.c tps65217.h cfg.h swi2cmst.h
 
 
 CPPFLAGS=-I. -Ilibxsvf -Imsp430-usb -Imsp430-usb/USB_config -Imsp430-usb/src -Imsp430-usb/src/F5xx_F6xx_Core_Lib \
-	-D__REGISTER_MODEL__ -D__TI_COMPILER_VERSION__ -D$(BOARD)
+	-D__REGISTER_MODEL__ -D__TI_COMPILER_VERSION__ -D$(BOARD) -DLIBXSVF_WITHOUT_SVF -DLIBXSVF_WITHOUT_SCAN
+
 USBOBJS=\
 	msp430-usb/src/USB_API/USB_Common/dma.o \
 	msp430-usb/src/USB_API/USB_Common/usb.o \
@@ -41,7 +42,7 @@ USBOBJS=\
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_PMM.o \
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_TLV.o \
 	usbConstructs.o usbEventHandling.o
-LIBXSVFOBJS=libxsvf/xsvf.o libxsvf/play.o libxsvf/tap.o libxsvf/svf.o libxsvf/scan.o
+LIBXSVFOBJS=libxsvf/xsvf.o libxsvf/play.o libxsvf/tap.o
 USBFWOBJS=ordb3a_main.o jtag.o msp430-usb/USB_config/descriptors.o \
 	boardinit.o tps65217.o swi2cmst.o uart.o \
 	msp430-usb/src/F5xx_F6xx_Core_Lib/HAL_PMAP.o \
